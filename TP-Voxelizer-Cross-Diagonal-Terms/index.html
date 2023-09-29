@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>TP</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+<!-- Online libraries and dependencies -->
+<script src='https://abubujs.org/libs/Abubu.latest.js'
+	    type='text/javascript'></script>
+<script 
+src='https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/ace.js'  
+type="text/javascript" charset="utf-8">
+</script>
+<script 
+    src='https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/mode-glsl.js'>
+</script>
+<script 
+    src='https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/theme-tomorrow.js'>
+</script>
+<script
+    src='https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/keybinding-vim.js'>
+</script>
+<script 
+    src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js">
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+
+<style>
+
+/* unvisited link */
+a:link {
+    	color: blue;
+}
+
+/* visited link */
+a:visited {
+    	color: blue;
+}
+
+/* mouse over link */
+a:hover {
+    	color: hotpink;
+}
+
+/* selected link */
+a:active {
+    	color: blue;
+}
+/*
+li{
+    	margin : 10px 6px ;
+} */
+
+body {
+	counter-reset: h1;
+}
+
+
+h1{
+        max-width: 1024px ;
+	text-align:left;
+	color: white;
+       	background-color: #00254c;
+       	padding-left: 20px ;
+       	padding-top: 10px ;
+       	padding-bottom: 10px ;
+       	border-radius: 10px;
+}
+
+h2 {
+        max-width: 1024px ;
+    	color: #00254c;
+    	background-color: #e5e5e5 ;
+    	padding-left: 20px ;
+    	padding-top: 2.5px ;
+    	padding-bottom: 2.5px ;
+
+    	border-radius: 10px;
+}
+
+h3 {
+        max-width: 1024px ;
+    	color: #00254c;
+    	background-color: #f0f0f0 ;
+    	padding-left: 20px ;
+    	padding-top: 2.5px ;
+    	padding-bottom: 2.5px ;
+    	border-radius: 10px;
+}
+
+h4 {
+        max-width: 1024px ;
+    	color: #00254c;
+    	background-color: #fafafa ;
+    	padding-left: 20px ;
+    	padding-top: 2.5px ;
+    	padding-bottom: 2.5px ;
+    	border-radius: 10px;
+}
+
+p{
+    max-width : 700px  ;
+    padding-left: 10px ;
+}
+canvas.clickable:hover{
+    cursor:pointer ;
+    cursor:hand ;
+}
+
+.footer{
+    position : fixed ; 
+    max-width: 1024px ;
+    border-radius:10px ;
+    left : 0px ;
+    width : 100% ;
+    background-color: #fafafa;
+    color:black ;
+    bottom: 0px ;
+    text-align : left ;
+    font: 'italic 12pt Times' ;
+}
+
+
+div.relative {
+  position: relative;
+  height: 512px;
+  border: 1px solid black;
+  width:100% ;
+} 
+
+div.editor {
+  position : absolute;
+  top: 0px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width:100%;
+}
+#loading { 
+    position : fixed ;
+    bottom : 20px ;
+    left : 10px ;
+}
+#loadProgress {
+    width : 300px ;
+    background-color: #ddd ;
+}
+#loadBar {
+    width : 0% ;
+    height : 20px ;
+    background-color: #4caf50 ;
+    border-radius: 3px ;
+}
+
+</style>
+
+
+</head>
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<!-- body of the html page                                             -->
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<body>
+    <h1>TP Ventricular Model</h1>
+    
+    <div id='chooser'>
+        <h2>Select the JSON file containing the structure</h2>
+        <p style='color:red'>Before you can proceed, you need to choose the structural
+        file!</p>
+       <input type='file' id='json_structure' accept='.json, .JSON'></input>
+    </div> 
+    <table>
+ 
+        </tr>
+        <tr>
+            <td>
+                <canvas id=canvas_1 width=512 height=512>
+                    Your browser doesn't support HTML5.0
+                </canvas>
+            </td>
+            <td>
+                <canvas id=canvas_2 width=512 height=512>
+                    Your browser doesn't support HTML5.0
+                </canvas>
+            </td>
+        </tr>
+    </table>
+<div class='loaded'>
+    <h3>Instructions for modifiable sections.</h3>
+<p>You can edit the source code for a number of the modeling shaders by accessing the <b>Edit/Save/Load Source Code</b> menu of the GUI. As soon as the shader is edited, the program automatically starts using the updated version of the code.</p>
+
+<p>Notice that GLSL does not allow for mixing of data types. So, floats
+and integers cannot be mixed unless directly type casted.</p>
+
+    <div class='relative' id='editorSection' style='display:none'>
+        <h2>Source code editor</h2>
+        <div class='editor' id='editor'></div>
+    </div>
+
+</div>    
+    
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<!-- All shaders included here (codes written in GLSL)                 -->
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<!-- ***************************************************************** -->
+<script id='directionator' type='x-shader-fragment'>#version 300 es
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * directionator.frag : find North, South, East, West, Up and Down
+ * dirction indices 
+ *
+ * PROGRAMMER   : ABOUZAR KABOUDIAN
+ *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+precision highp float;
+precision highp int ;
+precision highp isampler2D ;
+precision highp usampler2D ;
+
+/*========================================================================
+ * all direction macros go here for safe access
+ *========================================================================
+ */
+#define NORTH   dir0.r
+#define SOUTH   dir0.g
+#define EAST    dir0.b
+#define WEST    dir0.a
+
+#define UP      dir1.r
+#define DOWN    dir1.g
+
+#define MS12    dir2.r
+#define PS12    dir2.g
+#define MS13    dir2.b
+#define PS13    dir2.a
+
+#define MS21    dir3.r
+#define PS21    dir3.g
+#define MS23    dir3.b
+#define PS23    dir3.a
+
+#define MS31    dir4.r
+#define PS31    dir4.g
+#define MS32    dir4.b
+#define PS32    dir4.a
+
+/*========================================================================
+ * packing and unpacking two integers to and from a single unsigned int.
+ *========================================================================
+ */
+#define pack(i,j)   uint((uint(i)<<16)+uint(j))
+#define unpack(I)   ivec2(uint(I)>>16, uint(I) & uint(65535) )
+
+
+/*-------------------------------------------------------------------------
+ * interfacial variables
+ *-------------------------------------------------------------------------
+ */
+in vec2 cc ;
+
+uniform usampler2D fullTexelIndex, compressedTexelIndex ;
+uniform int mx, my ;
+
+/*------------------------------------------------------------------------
+ * output colors
+ *------------------------------------------------------------------------
+ */
+layout (location = 0) out uvec4 odir0 ;
+layout (location = 1) out uvec4 odir1 ;
+layout (location = 2) out uvec4 odir2 ;
+layout (location = 3) out uvec4 odir3 ;
+layout (location = 4) out uvec4 odir4 ;
+
+/*========================================================================
+ * getIJ: return the IJ index on the full 2d-matrix
+ *========================================================================
+ */
+ivec2 getIJ(ivec3 idx, ivec3 size){
+    int si = idx.z % mx ;
+    int sj = idx.z / mx ;
+
+    return ivec2(size.x*si + idx.x, (my-1-sj)*size.y + idx.y) ;
+}
+
+/*========================================================================
+ * getIdx: get the 3d index from the IJ indices
+ *========================================================================
+ */
+ivec3 getIdx( ivec2 IJ, ivec3 size ){
+    int si = IJ.x / size.x ;
+    int sj = (my - 1) - (IJ.y/size.y) ;
+
+    return ivec3( IJ.x % size.x, IJ.y % size.y , mx*sj + si ) ;
+}
+
+/*========================================================================
+ * macros 
+ *========================================================================
+ */
+#define isInBounds( v )     (all(greaterThanEqual(v,ivec3(0))) && \
+        all(lessThan(v,size)))
+
+#define texelInDomain(I)  ( texelFetch(compressedTexelIndex,(I),\
+            0).a==uint(1) )
+#define inDomain( v )   (texelInDomain( getIJ(v, size) )) 
+#define isNotGood(v)   (!( inDomain(v) && isInBounds( v ) ))
+
+/*========================================================================
+ * getPackedIndex: get packed index of the point by applying the zero-flux
+ * condition.
+ *========================================================================
+ */
+uint getPackedIndex( ivec3 C, ivec3 D, ivec3 size ){
+    ivec3 checkPoint = C+D ;
+    
+    if ( isNotGood(checkPoint) ){ /* if that direction is not good move in
+                                     the opposite direction */
+        checkPoint = C-D ;
+        if ( isNotGood( checkPoint ) ){ /* if the opposite direction is
+                                           not good either, use the
+                                           central point coordinate */
+            checkPoint = C ;
+        }
+    }
+    uvec2 targetIndex = texelFetch(
+            compressedTexelIndex,
+            getIJ(checkPoint,size),
+            0 ).xy ;
+    return pack(targetIndex.x,targetIndex.y) ;  
+}
+
+/*========================================================================
+ * main
+ *========================================================================
+ */
+void main(){
+    // get the sizes of the compressed and the full domain ...............
+    ivec2 compSize = textureSize(fullTexelIndex,        0 ) ;
+    ivec2 fullSize = textureSize(compressedTexelIndex,  0 ) ;
+
+    // calculate the resolution of the full domain .......................
+    ivec3 size = ivec3( fullSize.x/mx , fullSize.y/my, mx*my ) ;
+
+    // get the textel position and full texel index ......................
+    ivec2 texelPos = ivec2( cc*vec2(compSize) ) ; 
+    ivec4 fullTexelIndex = 
+        ivec4( texelFetch(  fullTexelIndex, texelPos, 0) ) ;
+
+    // if the texel is extra, just leave .................................
+    if ( fullTexelIndex.a != 1 ){
+        return ;
+    }
+    
+    // 3-dimentional index of the of texel ...............................
+    ivec3 cidx = getIdx( fullTexelIndex.xy , size ) ;
+
+    // diretionional unit vectors ........................................
+    ivec3 ii = ivec3(1,0,0) ;
+    ivec3 jj = ivec3(0,1,0) ;
+    ivec3 kk = ivec3(0,0,1) ;
+
+    // cross diagonal vectors ............................................
+    ivec3 s12 = jj-kk ;
+    ivec3 s13 = kk+jj ;
+
+    ivec3 s21 = ii-kk ;
+    ivec3 s23 = kk+ii ;
+    
+    ivec3 s31 = ii-jj ;
+    ivec3 s32 = jj+ii ;
+
+    // calculating the packed indices of the each compute point ..........
+    uvec4 dir0 , dir1, dir2, dir3, dir4 ;
+   
+    NORTH = getPackedIndex( cidx, jj, size) ; // north direction
+    SOUTH = getPackedIndex( cidx,-jj, size) ; // south direction
+    EAST  = getPackedIndex( cidx, ii, size) ; // east  direction
+    WEST  = getPackedIndex( cidx,-ii, size) ; // west  direction
+
+    UP    = getPackedIndex( cidx, kk, size) ; // up   direction
+    DOWN  = getPackedIndex( cidx,-kk, size) ; // down direction
+    
+    // cross-diagonal terms
+    MS12  = getPackedIndex( cidx,-s12, size) ;
+    PS12  = getPackedIndex( cidx, s12, size) ;
+    MS13  = getPackedIndex( cidx,-s13, size) ;
+    PS13  = getPackedIndex( cidx, s13, size) ;
+    
+    MS21  = getPackedIndex( cidx,-s21, size) ;
+    PS21  = getPackedIndex( cidx, s21, size) ;
+    MS23  = getPackedIndex( cidx,-s23, size) ;
+    PS23  = getPackedIndex( cidx, s23, size) ;
+    
+    MS31  = getPackedIndex( cidx,-s31, size) ;
+    PS31  = getPackedIndex( cidx, s31, size) ;
+    MS32  = getPackedIndex( cidx,-s32, size) ;
+    PS32  = getPackedIndex( cidx, s32, size) ;
+
+    // outputing the calculated points ...................................
+    odir0 = uvec4(dir0) ;
+    odir1 = uvec4(dir1) ;
+    odir2 = uvec4(dir2) ;
+    odir3 = uvec4(dir3) ;
+    odir4 = uvec4(dir4) ;
+
+    return ;
+}
+</script><!-- end of directionator shader's source code -->
+
+<!-- ***************************************************************** -->
+<script id='init' type='x-shader-fragment'>#version 300 es
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * init2.frag   : initialize color-sets for TP model   
+ * 
+ * PROGRAMMER   : ABOUZAR KABOUDIAN
+ * DATE         : Tue 09 May 2023 12:02:53 (EDT)
+ * PLACE        : Maryland, USA.
+ *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+
+precision highp float;
+precision highp int ;
+precision highp isampler2D ;
+precision highp usampler2D ;
+
+
+// interface variables ...................................................
+in vec2 cc ;
+
+// variable macros .......................................................
+#define V       color0.r
+#define vlt     color0.r
+#define v       color0.r
+#define vv      color0.r
+
+#define sf      color0.g
+#define Nai     color0.b
+#define Ki      color0.a 
+
+#define Cai     color1.r
+#define CaSS    color1.g
+#define ccass   CaSS
+#define CaSR    color1.b
+#define I_SumCa color1.a 
+
+#define sm      color2.r
+#define sh      color2.g
+#define sj      color2.b
+#define sxs     color2.a
+
+#define sd      color3.r
+#define sRR     color3.g
+#define sf2     color3.b
+#define sfcass  color3.a 
+
+#define sr      color4.r
+#define ss      color4.g
+#define sxr1    color4.b
+#define sxr2    color4.a
+
+#define EPI     0
+#define MYO     1
+#define ENDO    2
+
+#define vlt_txtr    icolor0
+#define vchannel r
+
+
+uniform int cellType ;
+
+// color outputs .........................................................
+layout (location = 0) out vec4 ocolor0 ; 
+layout (location = 1) out vec4 ocolor1 ; 
+layout (location = 2) out vec4 ocolor2 ; 
+layout (location = 3) out vec4 ocolor3 ; 
+layout (location = 4) out vec4 ocolor4 ; 
+
+/*========================================================================
+ * main body of the shader
+ *========================================================================
+ */
+void main(){
+    // color declarations ................................................
+    vec4 color0, color1, color2, color3,  color4;
+
+    if (cellType == EPI){
+        // Epi cells
+        V       = -85.46 ;
+        Cai     = 0.0001029;
+        CaSR    = 3.432;
+        CaSS    = 0.0002120;
+        Nai     = 9.293;
+        Ki      = 136.2;
+        sm      = 0.001633;
+        sh      = 0.7512;
+        sj      = 0.7508;
+        sxr1    = 0.0002052;
+        sxr2    = 0.4736;
+        sxs     = 0.003214;
+        sr      = 2.326e-8;
+        ss      = 1.000;
+        sd      = 3.270e-5;
+        sf      = 0.9767;
+        sf2     = 0.9995;
+        sfcass  = 1.000;
+        sRR     = 0.9891;
+    }else if (cellType == MYO){
+        // M-cells
+        V       = -84.53;
+        Cai     = 0.0001156;
+        CaSR    = 4.130;
+        CaSS    = 0.0002331;
+        Nai     = 9.322;
+        Ki      = 136.0;
+        sm      = 0.001694;
+        sh      = 0.7466;
+        sj      = 0.7457;
+        sxr1    = 0.0002140;
+        sxr2    = 0.4718;
+        sxs     = 0.003343;
+        sr      = 2.392e-8;
+        ss      = 1.000;
+        sd      = 3.345e-5;
+        sf      = 0.9595;
+        sf2     = 0.9995;
+        sfcass  = 1.000;
+        sRR     = 0.9874;
+    }else{
+        // endo
+        V       = -84.70;
+        Cai     = 0.0001021;
+        CaSR    = 3.385;
+        CaSS    = 0.0002111;
+        Nai     = 9.413;
+        Ki      = 136.1;
+        sm      = 0.001634;
+        sh      = 0.7512;
+        sj      = 0.7508;
+        sxr1    = 0.0002051;
+        sxr2    = 0.4736;
+        sxs     = 0.003213;
+        sr      = 2.326e-8;
+        ss      = 0.6401;
+        sd      = 3.270e-5;
+        sf      = 0.9771;
+        sf2     = 0.9995;
+        sfcass  = 1.000;
+        sRR     = 0.9891;
+    }
+
+    // output colors .....................................................
+    ocolor0 = vec4(color0 ) ;
+    ocolor1 = vec4(color1 ) ;
+    ocolor2 = vec4(color2 ) ;
+    ocolor3 = vec4(color3 ) ;
+    ocolor4 = vec4(color4 ) ;
+
+    return ;
+}
+</script><!-- end of init shader's source code -->
+
+<!-- ***************************************************************** -->
+<script id='comp' type='x-shader-fragment'>#version 300 es
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * comp.frag    : March TP model for one time-step
+ * 
+ * PROGRAMMER   : ABOUZAR KABOUDIAN
+ * DATE         : Tue 09 May 2023 11:26:26 (EDT)
+ * PLACE        : Maryland, USA.
+ *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+precision highp float;
+precision highp int ;
+precision highp isampler2D ;
+precision highp usampler2D ;
+
+
+in vec2 cc  ;
+
+/*========================================================================
+ * Comp Uniforms
+ *========================================================================
+ */
+
+/* uniform samplers of state variables  */
+uniform sampler2D   icolor0, icolor1, icolor2, icolor3, icolor4 ;
+
+uniform float   dt ;        /* time step                */
+uniform float   lx ;        /* domain size in x,y-dir   */
+uniform float   diffCoef ;  /* diffusion coeficient     */
+uniform float   C_m ;       /* membrane capacitance     */
+uniform int     mx, my ;    /* number of z-layers in 
+                               S and T directions 
+                               of the textures          */
+uniform float   capacitance ;
+
+// directional information ...............................................
+uniform usampler2D  idir0 ;
+uniform usampler2D  idir1 ;
+uniform usampler2D  idir2 ;
+uniform usampler2D  idir3 ;
+uniform usampler2D  idir4 ;
+uniform float omega ;
+
+/*========================================================================
+ * all direction macros go here for safe access
+ *========================================================================
+ */
+#define NORTH   dir0.r
+#define SOUTH   dir0.g
+#define EAST    dir0.b
+#define WEST    dir0.a
+
+#define UP      dir1.r
+#define DOWN    dir1.g
+
+#define MS12    dir2.r
+#define PS12    dir2.g
+#define MS13    dir2.b
+#define PS13    dir2.a
+
+#define MS21    dir3.r
+#define PS21    dir3.g
+#define MS23    dir3.b
+#define PS23    dir3.a
+
+#define MS31    dir4.r
+#define PS31    dir4.g
+#define MS32    dir4.b
+#define PS32    dir4.a
+
+/*========================================================================
+ * packing and unpacking two integers to and from a single unsigned int.
+ *========================================================================
+ */
+#define pack(i,j)   uint((uint(i)<<16)+uint(j))
+#define unpack(I)   ivec2(uint(I)>>16, uint(I) & uint(65535) )
+
+
+
+// coordinate of the system ..............................................
+uniform sampler2D   compressed3dCrdt ;
+       
+uniform int         cellType ;
+uniform float   C_CaL, C_pCa, C_bCa, C_leak, C_up, C_xfer, C_rel , 
+                C_Na,  C_bNa, C_NaK, C_NaCa, C_K1, C_to,
+                C_Kr,  C_Ks,  C_pK ;
+
+
+/*========================================================================
+ * Variable map
+ *========================================================================
+ */
+#define V       color0.r
+#define vlt     color0.r
+#define v       color0.r
+#define vv      color0.r
+
+#define sf      color0.g
+#define Nai     color0.b
+#define Ki      color0.a 
+
+#define Cai     color1.r
+#define CaSS    color1.g
+#define ccass   CaSS
+#define CaSR    color1.b
+#define I_SumCa color1.a 
+
+#define sm      color2.r
+#define sh      color2.g
+#define sj      color2.b
+#define sxs     color2.a
+
+#define sd      color3.r
+#define sRR     color3.g
+#define sf2     color3.b
+#define sfcass  color3.a 
+
+#define sr      color4.r
+#define ss      color4.g
+#define sxr1    color4.b
+#define sxr2    color4.a
+
+#define EPI     0
+#define MYO     1
+#define ENDO    2
+
+#define vlt_txtr    icolor0
+#define vchannel r
+
+
+// color outputs .........................................................
+layout (location = 0) out vec4 ocolor0 ;
+layout (location = 1) out vec4 ocolor1 ;
+layout (location = 2) out vec4 ocolor2 ;
+layout (location = 3) out vec4 ocolor3 ;
+layout (location = 4) out vec4 ocolor4 ;
+
+// Functions/macros for Rush-Larsen time integration .....................
+
+/*========================================================================
+ * RL1  : Rush Larsen 1: works with y_inf and tau_y
+ *      dy/dt = (y_inf - y)/tau_y where
+ *========================================================================
+ */
+float RL1(float yo, float y_inf, float tau_inf,float deltaT){
+    return y_inf + (yo - y_inf)*exp(-deltaT/tau_inf) ; 
+}
+
+/*========================================================================
+ * RL2 : Rush Larsen 2: works with a and b values 
+ *      dy/dt = (y_inf - y)/tau_y where
+ *      y_inf = a/(a+b)     and      tau_y = 1./(a+b)
+ *========================================================================
+ */
+float RL2(float yo, float a, float b,float deltaT){
+    float y_inf = a/(a+b) ;
+    float t_inf = 1./(a+b) ;
+
+    return RL1(yo,y_inf,t_inf,deltaT) ; 
+}
+
+/*========================================================================
+ * Rush-Larsen macro (assuming dt)
+ *========================================================================
+ */
+#define RushLarsen(a, a_inf, tau_a) (a_inf+((a)-(a_inf))*exp(-dt/(tau_a)))
+
+
+
+void laplacian(sampler2D icolor, out ivec2 texelPos, out vec4 l){
+    ivec2 size = textureSize(icolor, 0 ) ;
+    texelPos = ivec2(cc*vec2(size)) ;
+    
+    // directional channels ..............................................
+    uvec4 dir0  = texelFetch(idir0 , texelPos, 0 ) ;
+    uvec4 dir1  = texelFetch(idir1 , texelPos, 0 ) ;
+    uvec4 dir2  = texelFetch(idir2 , texelPos, 0 ) ;
+    uvec4 dir3  = texelFetch(idir3 , texelPos, 0 ) ;
+    uvec4 dir4  = texelFetch(idir4 , texelPos, 0 ) ;
+
+    float dx = lx/float(mx*my) ;  
+    
+    vec4 UNORTH = texelFetch( icolor , unpack( NORTH ), 0 ) ; 
+    vec4 USOUTH = texelFetch( icolor , unpack( SOUTH ), 0 ) ; 
+    vec4 UEAST  = texelFetch( icolor , unpack( EAST  ), 0 ) ;
+    vec4 UWEST  = texelFetch( icolor , unpack( WEST  ), 0 ) ;
+    vec4 UUP    = texelFetch( icolor , unpack( UP    ), 0 ) ;
+    vec4 UDOWN  = texelFetch( icolor , unpack( DOWN  ), 0 ) ;
+    vec4 UCENTER= texelFetch( icolor , texelPos       , 0 ) ;   
+    vec4 UMS12  = texelFetch( icolor , unpack( MS12 ) , 0 ) ; 
+    vec4 UPS12  = texelFetch( icolor , unpack( PS12 ) , 0 ) ; 
+    vec4 UMS13  = texelFetch( icolor , unpack( MS13 ) , 0 ) ; 
+    vec4 UPS13  = texelFetch( icolor , unpack( PS13 ) , 0 ) ; 
+    vec4 UMS21  = texelFetch( icolor , unpack( MS21 ) , 0 ) ; 
+    vec4 UPS21  = texelFetch( icolor , unpack( PS21 ) , 0 ) ; 
+    vec4 UMS23  = texelFetch( icolor , unpack( MS23 ) , 0 ) ; 
+    vec4 UPS23  = texelFetch( icolor , unpack( PS23 ) , 0 ) ; 
+    vec4 UMS31  = texelFetch( icolor , unpack( MS31 ) , 0 ) ; 
+    vec4 UPS31  = texelFetch( icolor , unpack( PS31 ) , 0 ) ; 
+    vec4 UMS32  = texelFetch( icolor , unpack( MS32 ) , 0 ) ; 
+    vec4 UPS32  = texelFetch( icolor , unpack( PS32 ) , 0 ) ; 
+
+    l = (
+            (1.-2.*omega/3.)*
+                ( UNORTH + USOUTH + UEAST + UWEST + UUP + UDOWN)
+            +(2.*omega-6.)*UCENTER
+            +(omega/6.)*
+                (UMS12+UPS12+UMS13+UPS13+UMS21+UPS21+UMS23+UPS23
+                    +UMS31+UPS31+UMS32+UPS32        ) 
+    )/(dx*dx) ;
+
+    return ;
+}
+/*========================================================================
+ * main body of the shader
+ *========================================================================
+ */
+void main(){
+    vec4 lap ;
+    ivec2 texelPos ;
+
+    laplacian( icolor0, texelPos, lap ) ;
+
+
+    // localizing color values ...........................................
+    vec4 color0  = texelFetch(icolor0 , texelPos, 0) ;
+    vec4 color1  = texelFetch(icolor1 , texelPos, 0) ;
+    vec4 color2  = texelFetch(icolor2 , texelPos, 0) ;
+    vec4 color3  = texelFetch(icolor3 , texelPos, 0) ;
+    vec4 color4  = texelFetch(icolor4 , texelPos, 0) ;
+    
+/*------------------------------------------------------------------------
+ * parameters
+ *------------------------------------------------------------------------
+ */
+    float Ko=5.4;           float Cao=2.0;          float Nao=140.0 ;
+    float Vc=0.016404;      float Vsr=0.001094;     float Vss=0.00005468 ;
+    float Bufc=0.2;         float Kbufc=0.001;      float Bufsr=10.;
+    float Kbufsr=0.3;       float Bufss=0.4;        float Kbufss=0.00025 ;
+    float Vmaxup=0.006375;  float Kup=0.00025;      float Vrel=0.102 ;
+    float k3=0.060;         float k4=0.005;
+    float k1prime=0.15;     float k2prime=0.045;
+    float EC=1.5;           float maxsr=2.5;        float minsr=1.;
+    float Vleak=0.00036;    float Vxfer=0.0038;
+    float RR=8314.3;        float FF=96486.7;       float TT=310.0;
+//  float RR=8314.472 ;     float FF=96485.3415;    float TT=310.0;
+// try setting CAPACITANCE to 1 and to 1.534e-4, two values others use
+// pretty clearly not 1.534e-4; too small, transients disappear
+//    float CAPACITANCE=0.185 ;
+    float CAPACITANCE=capacitance ;
+//  CAPACITANCE=1.0;
+    float   Gks, Gto ;
+    if (cellType == EPI ){
+        Gks=0.392 ; Gto=0.294 ;
+    } else if (cellType == ENDO ){
+        Gks=0.392;  Gto=0.073 ;
+    }else{
+       Gks=0.098 ; Gto=0.294 ;
+    }
+
+    float Gkr=0.153;    float pKNa=0.03;        
+    float GK1=5.405;    float alphanaca=2.5;
+    float GNa=14.838;   float GbNa=0.00029;     
+    float KmK=1.0;      float KmNa=40.0;
+    float knak=2.724;   float GCaL=0.00003980;  
+    float GbCa=0.000592;
+    float knaca=1000.;  float KmNai=87.5;       
+    float KmCa=1.38;    float ksat=0.1;
+    float n=0.35;       float GpCa=0.1238;      
+    float KpCa=0.0005;  float GpK=0.0146;
+
+/*------------------------------------------------------------------------
+ * helpful values
+ *------------------------------------------------------------------------
+ */
+    float   inverseVcF2=1./(2.*Vc*FF) ;
+    float   inverseVcF=1./(Vc*FF) ;
+    float   inversevssF2=1./(2.*Vss*FF) ;
+    float   rtof=(RR*TT)/FF ;
+    float   fort=1./rtof ;
+    float   KmNai3=KmNai*KmNai*KmNai ;
+    float   Nao3=Nao*Nao*Nao ;
+    float   Gkrfactor=sqrt(Ko/5.4) ;
+
+/*------------------------------------------------------------------------
+ * m
+ *------------------------------------------------------------------------
+ */
+    float   AM      =   1./(1.+exp((-60.-vv)/5.)) ;
+    float   BM      =   0.1/(1.+exp((vv+35.)/5.))
+                    +   0.10/(1.+exp((vv-50.)/200.)) ;
+
+    float   minft   =   1./((1.+exp((-56.86-vv)/9.03))*
+                                (1.+exp((-56.86-vv)/9.03))) ;
+    float   TAU_M   =   AM*BM ;
+    float   exptaumt=   exp(-dt/TAU_M) ;
+
+    float   hinft   =   1./((1.+exp((vv+71.55)/7.43))
+                                *(1.+exp((vv+71.55)/7.43))) ;
+    
+    sm = minft-(minft-sm)*exptaumt ;
+
+/*------------------------------------------------------------------------
+ * h
+ *------------------------------------------------------------------------
+ */
+    float   AH, BH ;
+    if(vv >=-40.){
+        AH=0. ;
+        BH=(0.77/(0.13*(1.+exp(-(vv+10.66)/11.1)))) ;
+    }
+    else{
+        AH=(0.057*exp(-(vv+80.)/6.8)) ;
+        BH=(2.7*exp(0.079*vv)+(3.1e5)*exp(0.3485*vv)) ;
+    }
+    float   TAU_H   =1.0/(AH+BH) ;
+    float   exptauht=exp(-dt/TAU_H) ;
+    
+    sh  = hinft-(hinft-sh)*exptauht ;
+
+/*------------------------------------------------------------------------
+ * j
+ *------------------------------------------------------------------------
+ */
+    float AJ, BJ ;
+    if(vv >=-40.){ 
+        AJ=0. ;
+        BJ=(0.6*exp((0.057)*vv)/(1.+exp(-0.1*(vv+32.)))) ;
+    }
+    else{
+        AJ= (((-2.5428e4)*exp(0.2444*vv)-(6.948e-6)
+                    *exp(-0.04391*vv))*(vv+37.78)
+                    /(1.+exp(0.311*(vv+79.23)))) ;
+        BJ= (0.02424*exp(-0.01052*vv)
+                /(1.+exp(-0.1378*(vv+40.14)))) ;
+    }
+    float   jinft   =   hinft ;
+    float   TAU_J   =   1.0/(AJ+BJ) ;
+    float   exptaujt=exp(-dt/TAU_J) ;
+    
+    sj  = jinft-(jinft-sj)*exptaujt ;
+
+/*------------------------------------------------------------------------
+ * xs
+ *------------------------------------------------------------------------
+ */
+    float   xsinft  =   1./(1.+exp((-5.-vv)/14.)) ;
+    float   Axs     =   (1400./(sqrt(1.+exp((5.-vv)/6.)))) ;
+    float   Bxs     =   (1./(1.+exp((vv-35.)/15.))) ;
+    float   TAU_Xs  =   Axs*Bxs+80. ;
+    float   exptauxst=  exp(-dt/TAU_Xs) ;
+
+    sxs     =   xsinft-(xsinft-sxs)*exptauxst ;
+
+/*------------------------------------------------------------------------
+ * d
+ *------------------------------------------------------------------------
+ */
+    float   dinft   =   1./(1.+exp((-8.-vv)/7.5)) ;
+    float   Ad      =   1.4/(1.+exp((-35.-vv)/13.))+0.25 ;
+    float   Bd      =   1.4/(1.+exp((vv+5.)/5.)) ;
+    float   Cd      =   1./(1.+exp((50.-vv)/20.)) ;
+    float   TAU_D   =   Ad*Bd+Cd ;
+    float   exptaudt=   exp(-dt/TAU_D) ;
+    
+    sd              =   dinft-(dinft-sd)*exptaudt ;
+
+/*------------------------------------------------------------------------
+ * f
+ *------------------------------------------------------------------------
+ */
+    float   finft   =   1./(1.+exp((vv+20.)/7.));
+    float   Af      =   1102.5*exp(-(vv+27.)*(vv+27.)/225.) ;
+    float   Bf      =   200./(1.+exp((13.-vv)/10.)) ;
+    float   Cf      =   (180./(1.+exp((vv+30.)/10.)))+20. ;
+    float   TAU_F   =   Af+Bf+Cf ;
+    float   exptauft=   exp(-dt/TAU_F) ;
+
+    sf              =   finft-(finft-sf)*exptauft ;
+
+
+/*------------------------------------------------------------------------
+ * f2
+ *------------------------------------------------------------------------
+ */
+    float   f2inft  =   0.67/(1.+exp((vv+35.)/7.))+0.33 ;
+//  original code had the following, but paper uses denom of 170**2, not 7**2
+    float   Af2     =   600.*exp(-(vv+25.)*(vv+25.)/49.) ;
+//  paper value for Af2 is INCORRECT to match the figure
+//  float  Af2      =   600.*exp(-(vv+25.)*(vv+25.)/(170.*170.)) ;
+    float   Bf2     =   31./(1.+exp((25.-vv)/10.)) ;
+    float   Cf2     =   16./(1.+exp((vv+30.)/10.)) ;
+    float   TAU_F2  =   Af2+Bf2+Cf2 ;
+    float   exptauf2t=exp(-dt/TAU_F2) ;
+
+    sf2             =   f2inft-(f2inft-sf2)*exptauf2t ;
+
+/*------------------------------------------------------------------------
+ * fcass
+ *------------------------------------------------------------------------
+ */
+    float   fcassinft   =   0.6/(1.+(ccass/0.05)*(ccass/0.05))+0.4 ;
+    float   taufcass    =   80./(1.+(ccass/0.05)*(ccass/0.05))+2. ;
+    float   exptaufcasst=   exp(-dt/taufcass) ;
+    float   exptaufcassinf= exp(-dt/2.0) ;
+ 
+    float   casshi      =   1.0 ;
+    float   FCaSS_INF, exptaufcass ;
+
+    if ( CaSS >= casshi ){
+        FCaSS_INF   =   0.4 ;
+        exptaufcass =   exptaufcassinf ;
+    }else{
+        FCaSS_INF   =   fcassinft ;
+        exptaufcass =   exptaufcasst ;
+    }
+    
+    sfcass          =   FCaSS_INF-(FCaSS_INF-sfcass)*exptaufcass ;
+
+/*------------------------------------------------------------------------
+ * r, s
+ *------------------------------------------------------------------------
+ */
+    float rinft, sinft ;
+    float TAU_R, TAU_S ;
+    if(cellType == EPI){
+        rinft   =   1./(1.+exp((20.-vv)/6.)) ;
+        sinft   =   1./(1.+exp((vv+20.)/5.)) ;
+        TAU_R   =   9.5*exp(-(vv+40.)*(vv+40.)/1800.)+0.8 ;
+        TAU_S   =   85.*exp(-(vv+45.)*(vv+45.)/320.)
+                +   5./(1.+exp((vv-20.)/5.))+3. ;
+    }else if(cellType == ENDO){
+        rinft   =   1./(1.+exp((20.-vv)/6.)) ;
+        sinft   =   1./(1.+exp((vv+28.)/5.)) ;
+        TAU_R   =   9.5*exp(-(vv+40.)*(vv+40.)/1800.)+0.8 ;
+        TAU_S   =   1000.*exp(-(vv+67.)*(vv+67.)/1000.)+8. ;
+    }else{
+        rinft   =   1./(1.+exp((20.-vv)/6.)) ;
+        sinft   =   1./(1.+exp((vv+20.)/5.)) ;
+        TAU_R   =   9.5*exp(-(vv+40.)*(vv+40.)/1800.)+0.8 ;
+        TAU_S   =   85.*exp(-(vv+45.)*(vv+45.)/320.)
+                +   5./(1.+exp((vv-20.)/5.))+3. ;
+    }
+    float   exptaurt    =   exp(-dt/TAU_R) ;
+    float   exptaust    =   exp(-dt/TAU_S) ;
+    sr  = rinft-(rinft-sr)*exptaurt ;
+    ss  = sinft-(sinft-ss)*exptaust ;
+
+/*------------------------------------------------------------------------
+ * xr1, xr2
+ *------------------------------------------------------------------------
+ */
+    float   xr1inft     =   1./(1.+exp((-26.-vv)/7.)) ;
+    float   axr1        =   450./(1.+exp((-45.-vv)/10.)) ;
+    float   bxr1        =   6./(1.+exp((vv-(-30.))/11.5)) ;
+    float   TAU_Xr1     =   axr1*bxr1 ;
+    float   exptauxr1t  =   exp(-dt/TAU_Xr1) ;
+    float   xr2inft     =   1./(1.+exp((vv-(-88.))/24.)) ;
+    float   axr2        =   3./(1.+exp((-60.-vv)/20.)) ;
+    float   bxr2        =   1.12/(1.+exp((vv-60.)/20.)) ;
+    float   TAU_Xr2     =   axr2*bxr2 ;
+    float   exptauxr2t  =   exp(-dt/TAU_Xr2) ;
+    
+    sxr1 = xr1inft-(xr1inft-sxr1)*exptauxr1t ;
+    sxr2 = xr2inft-(xr2inft-sxr2)*exptauxr2t ;
+
+        
+/*========================================================================
+ * reversal potentials
+ *========================================================================
+ */
+    float   Ek      = rtof*(log((Ko/Ki))) ;
+    float   Ena     = rtof*(log((Nao/Nai))) ;
+    float   Eks     = rtof*(log((Ko+pKNa*Nao)/(Ki+pKNa*Nai))) ;
+    float   Eca     = 0.5*rtof*(log((Cao/Cai))) ;
+
+/*========================================================================
+ * INaCa
+ *========================================================================
+ */
+
+/*------------------------------------------------------------------------
+ * I_Na
+ *------------------------------------------------------------------------
+ */
+    float   INa = GNa*sm*sm*sm*sh*sj*(v-Ena) ;
+    INa         = INa*C_Na ;
+/*------------------------------------------------------------------------
+ * I_Kr
+ *------------------------------------------------------------------------
+ */
+    float   IKr = Gkr*Gkrfactor*sxr1*sxr2*(v-Ek) ;
+    IKr         = IKr*C_Kr ;
+
+/*------------------------------------------------------------------------
+ * I_Ks
+ *------------------------------------------------------------------------
+ */
+    float   IKs = Gks*sxs*sxs*(v-Eks) ;
+    IKs         = IKs*C_Ks ;
+
+/*------------------------------------------------------------------------
+ * I_to
+ *------------------------------------------------------------------------
+ */
+    float   Ito = Gto*sr*ss*(v-Ek) ;
+    Ito         = Ito*C_to ;
+
+/*------------------------------------------------------------------------
+ * I_K1
+ *------------------------------------------------------------------------
+ */
+    float   vmek=v-Ek ;
+    float   Ak1 =   0.1/(1.+exp(0.06*(vmek-200.))) ;
+    float   Bk1 =   (3.*exp(0.0002*(vmek+100.))
+                +   exp(0.1*(vmek-10.)))/(1.+exp(-0.5*(vmek))) ;
+    float   ik1coefft=GK1*Ak1/(Ak1+Bk1) ;
+    
+    float   IK1= ik1coefft*(v-Ek) ;
+
+    IK1         = IK1*C_K1 ;
+
+/*------------------------------------------------------------------------
+ * I_pK
+ *------------------------------------------------------------------------
+ */
+    float   ipkcoefft   =   GpK/(1.+exp((25.-vv)/5.98)) ;
+
+    float   IpK         =   ipkcoefft*(v-Ek) ;
+    IpK                 =   IpK*C_pK ;
+
+/*------------------------------------------------------------------------
+ * I_bNa
+ *------------------------------------------------------------------------
+ */
+    float   IbNa        =   GbNa*(v-Ena) ;
+    IbNa                =   IbNa*C_bNa ;
+
+/*------------------------------------------------------------------------
+ * I_NaK
+ *------------------------------------------------------------------------
+ */
+    float   inakcoefft  =   (1./(1.+0.1245*exp(-0.1*vv*fort)
+                        +   0.0353*exp(-vv*fort)))*knak*(Ko/(Ko+KmK)) ;
+
+    float   INaK        =   inakcoefft*(Nai/(Nai+KmNa)) ;
+    INaK                =   INaK*C_NaK ;
+
+/*------------------------------------------------------------------------
+ * I_NaCa
+ *------------------------------------------------------------------------
+ */
+    float   temp        =   exp((n-1.)*vv*fort) ;
+    float   temp2       =   knaca/((KmNai3+Nao3)*(KmCa+Cao)*(1.+ksat*temp)) ;
+    float   inaca1t     =   temp2*exp(n*vv*fort)*Cao ;
+    float   inaca2t     =   temp2*temp*Nao3*alphanaca ;
+
+    float   INaCa       =   inaca1t*Nai*Nai*Nai-inaca2t*Cai ;
+    INaCa               =   INaCa*C_NaCa ;
+
+
+/*------------------------------------------------------------------------
+ * Na_i
+ *------------------------------------------------------------------------
+ */
+    float   dNai    =   -(INa+IbNa+3.*INaK+3.*INaCa)*inverseVcF*CAPACITANCE ;
+    
+    Nai             =   Nai+dt*dNai ;
+
+/*------------------------------------------------------------------------
+ * K_i
+ *------------------------------------------------------------------------
+ */
+    float   Istim ;
+    Istim = 0.0 ;
+
+    float   dKi =-(Istim+IK1+Ito+IKr+IKs-2.*INaK+IpK)*inverseVcF*CAPACITANCE ;
+    Ki          =   Ki +   dt*dKi ;
+
+/*------------------------------------------------------------------------
+ * ISumNaK
+ *------------------------------------------------------------------------
+ */
+    float   ISumNaK    = INa   + IbNa  + INaK  + IK1 
+                        + IKr   + IKs   + IpK   + Ito ;
+
+/*========================================================================
+ * cssr
+ *========================================================================
+ */
+
+/*------------------------------------------------------------------------
+ * ICaL
+ *------------------------------------------------------------------------
+ */
+    temp    =   exp(2.*(vv-15.)*fort) ;
+    float  ical1t ,  ical2t ;
+    if(abs(vv-15.) < 1.e-4){
+        float diff  = 1.e-4 ; 
+        temp        =   exp(2.*(diff)*fort) ;
+        ical1t      = GCaL*4.*(diff)*(FF*fort)*(0.25*temp)/(temp-1.) ;
+        ical2t      = GCaL*4.*(diff)*(FF*fort)*Cao/(temp-1.) ;
+
+    }else{
+        ical1t      = GCaL*4.*(vv-15.)*(FF*fort)*(0.25*temp)/(temp-1.) ;
+        ical2t      = GCaL*4.*(vv-15.)*(FF*fort)*Cao/(temp-1.) ;
+    }
+
+    float   ICaL    = sd*sf*sf2*sfcass*(ical1t*CaSS-ical2t) ;
+    ICaL *= C_CaL ;
+
+/*------------------------------------------------------------------------
+ * IpCa
+ *------------------------------------------------------------------------
+ */
+    float   IpCa    =   GpCa*Cai/(KpCa+Cai) ;
+    IpCa *= C_pCa ;
+
+/*------------------------------------------------------------------------
+ * IbCa
+ *------------------------------------------------------------------------
+ */
+    float   IbCa    = GbCa*(vv-Eca) ;
+    IbCa *= C_bCa ;
+
+/*------------------------------------------------------------------------
+ * update concentrations
+ *------------------------------------------------------------------------
+ */
+    float   kCaSR   =   maxsr-((maxsr-minsr)/(1.+(EC/CaSR)*(EC/CaSR))) ;
+    float   k1      =   k1prime/kCaSR ;
+    float   k2      =   k2prime*kCaSR ;
+    float   dRR     =   k4*(1.-sRR)-k2*CaSS*sRR ;
+    sRR             =   sRR+dt*dRR ;
+    float   sOO     =   k1*CaSS*CaSS*sRR/(k3+k1*CaSS*CaSS) ;
+
+
+/*------------------------------------------------------------------------
+ * Intracellular currents
+ *------------------------------------------------------------------------
+ */
+    float   Irel    =   C_rel*Vrel*sOO*(CaSR-CaSS) ;
+    float   Ileak   =   C_leak*Vleak*(CaSR-Cai) ;
+    float   Iup     =   C_up*Vmaxup/(1.+((Kup*Kup)/(Cai*Cai))) ;
+    float   Ixfer   =   C_xfer*Vxfer*(CaSS-Cai) ;
+
+/*------------------------------------------------------------------------
+ * update concentrations
+ *------------------------------------------------------------------------
+ */
+    float   CaCSQN  =   Bufsr*CaSR/(CaSR+Kbufsr) ;
+    float   dCaSR   =   dt*(Iup-Irel-Ileak) ;
+    float   bjsr    =   Bufsr-CaCSQN-dCaSR-CaSR+Kbufsr ;
+    float   cjsr    =   Kbufsr*(CaCSQN+dCaSR+CaSR) ;
+    CaSR            =   (sqrt(bjsr*bjsr+4.*cjsr)-bjsr)/2. ;
+
+    float   CaSSBuf =   Bufss*CaSS/(CaSS+Kbufss) ;
+    float   dCaSS   =   dt*(-Ixfer*(Vc/Vss)+Irel*(Vsr/Vss)
+                    +   (-ICaL*inversevssF2*CAPACITANCE)) ;
+    float   bcss    =   Bufss-CaSSBuf-dCaSS-CaSS+Kbufss ;
+    float   ccss    =   Kbufss*(CaSSBuf+dCaSS+CaSS) ;
+    CaSS            =   (sqrt(bcss*bcss+4.*ccss)-bcss)/2. ;
+
+    float   CaBuf   =   Bufc*Cai/(Cai+Kbufc) ;
+    float   dCai    =   dt*(    (   -(IbCa+IpCa-2.*INaCa)
+                                    *inverseVcF2
+                                    *CAPACITANCE 
+                                )
+                                -(Iup-Ileak)
+                                *(Vsr/Vc)
+                                +
+                                Ixfer
+                            ) ;
+    float   BC      =   Bufc-CaBuf-dCai-Cai+Kbufc ;
+    float   CC      =   Kbufc*(CaBuf+dCai+Cai) ;
+    Cai             =   (sqrt(BC*BC+4.*CC)-BC)/2. ;
+
+/*------------------------------------------------------------------------
+ * I_SumCa
+ *------------------------------------------------------------------------
+ */
+    float   ISumCa  = ICaL + IpCa + IbCa ;
+
+/*------------------------------------------------------------------------
+ * I_sum
+ *------------------------------------------------------------------------
+ */
+    float I_sum =  ISumCa + ISumNaK + INaCa ;
+
+
+    // V .................................................................
+    float dv2dt = lap.r*diffCoef - I_sum/C_m ;
+    
+    V += dv2dt*dt ;
+
+    // outputting colors .................................................
+    ocolor0 = vec4(color0) ;
+    ocolor1 = vec4(color1) ;
+    ocolor2 = vec4(color2) ;
+    ocolor3 = vec4(color3) ;
+    ocolor4 = vec4(color4) ;
+
+    return ;
+}
+</script><!-- end of comp shader's source code -->
+
+<!-- ***************************************************************** -->
+<script id='click' type='x-shader-fragment'>#version 300 es
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * click.frag   : Create activations on the tissue
+ * 
+ * PROGRAMMER   : ABOUZAR KABOUDIAN
+ * DATE         : Tue 09 May 2023 12:02:33 (EDT)
+ * PLACE        : Maryland, USA.
+ *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+
+precision highp float;
+precision highp int ;
+precision highp isampler2D ;
+precision highp usampler2D ;
+
+
+// interfacial variables .................................................
+in vec2 cc ;
+
+uniform sampler2D   icolor0 ;
+uniform sampler2D   compressed3dCrdt ;
+
+uniform sampler2D   projectedCoordinates ;
+uniform vec2        clickPosition ;
+
+uniform float       clickRadius ;
+
+// output color ..........................................................
+layout (location = 0) out vec4 ocolor0 ;
+
+#define V       color0.r
+#define vlt     color0.r
+#define v       color0.r
+#define vv      color0.r
+
+#define sf      color0.g
+#define Nai     color0.b
+#define Ki      color0.a 
+
+#define Cai     color1.r
+#define CaSS    color1.g
+#define ccass   CaSS
+#define CaSR    color1.b
+#define I_SumCa color1.a 
+
+#define sm      color2.r
+#define sh      color2.g
+#define sj      color2.b
+#define sxs     color2.a
+
+#define sd      color3.r
+#define sRR     color3.g
+#define sf2     color3.b
+#define sfcass  color3.a 
+
+#define sr      color4.r
+#define ss      color4.g
+#define sxr1    color4.b
+#define sxr2    color4.a
+
+#define EPI     0
+#define MYO     1
+#define ENDO    2
+
+#define vlt_txtr    icolor0
+#define vchannel r
+
+
+/*========================================================================
+ * main
+ *========================================================================
+ */
+void main(){
+    vec4 color0 = texture( icolor0 , cc ) ;
+    vec3 texelCrdt = texture(compressed3dCrdt, cc ).xyz ;
+    vec3 clickCrdt = texture(projectedCoordinates, clickPosition ).xyz ; 
+
+    if (length(texelCrdt - clickCrdt )<clickRadius ){
+        vlt = 1. ;
+    }
+
+    ocolor0 = vec4(color0) ;
+    return ;
+}
+</script><!-- end of click shader's source code -->
+
+
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<!-- main script - JavaScript code                                     -->
+<!--&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&-->
+<script>
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ * app.js       : TP Model  
+ *
+ * PROGRAMMER   : ABOUZAR KABOUDIAN
+ * DATE         : Tue 09 May 2023 12:06:22 (EDT)
+ * PLACE        : Maryland, USA.
+ *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ */
+
+"use strict" ;
+
+/*========================================================================
+ * get the source code for fragment shaders
+ *========================================================================
+ */
+function source( id ){
+    return document.getElementById( id ).innerHTML ;
+}
+/*========================================================================
+ * Global Parameters
+ *========================================================================
+ */
+let env = {} ;
+
+/*========================================================================
+ * import surface data
+ *========================================================================
+ */
+let loadedJSON ;
+
+/*========================================================================
+ * let the user select the file
+ *========================================================================
+ */
+var fileInput = document.getElementById('json_structure') ;
+
+fileInput.onchange = function(){
+  let file = fileInput.files[0] ;
+  if ( !file ){
+      return ;
+  }
+  let reader = new FileReader() ;
+  reader.readAsText(file) ;
+
+  reader.onload = function(e){
+      let result = e.target.result ;
+      loadedJSON = JSON.parse(result) ;
+      $('#chooser').hide() ;
+      $('.loaded').show() ;
+      loadWebGL() ;
+  } ;
+}
+
+/*========================================================================
+ * read from file on the server
+ *========================================================================
+ */
+//let structureFile = new XMLHttpRequest();
+//
+//structureFile.onreadystatechange = () => {
+//    if (structureFile.readyState == 4 && structureFile.status == 200) {
+//        loadedJSON = JSON.parse(structureFile.responseText);
+//        console.log(loadedJSON) ;
+//        loadWebGL() ;
+//    }
+//};
+//console.log("324") ;
+//structureFile.open("GET", "jsons/01-350um-128-128-128.json", true);
+//structureFile.send();
+var gl = Abubu.gl ;
+/*========================================================================
+ * Initialization of the GPU and Container
+ *========================================================================
+ */
+function loadWebGL()
+{
+    env.allFloats   = [] ; // uniform shared floats
+    env.allInts     = [] ; // uniform shared integers
+    env.allTxtrs    = [] ; // uniform shared textures
+
+/*------------------------------------------------------------------------
+ * display parameters
+ *------------------------------------------------------------------------
+ */
+    env.colormap    = 'rainbowHotSpring' ;
+    env.dispWidth   = 512 ;
+    env.dispHeight  = 512 ;
+
+    env.canvas_1 = document.getElementById("canvas_1") ;
+    env.canvas_2 = document.getElementById("canvas_2") ;
+    env.canvas_1.width  = env.dispWidth ;
+    env.canvas_1.height = env.dispHeight ;
+
+/*------------------------------------------------------------------------
+ * load the structure and process it
+ *------------------------------------------------------------------------
+ */
+    env.mx = loadedJSON.mx ; env.my = loadedJSON.my ;
+    env.allInts = [...env.allInts, 'mx','my' ] ;
+
+    env.structure = new Abubu.StructureFromJSON( loadedJSON ) ;
+
+    env.width                   = env.structure.width ;
+    env.height                  = env.structure.height ;
+    env.fwidth                  = env.structure.fwidth ; 
+    env.fheight                 = env.structure.fheight ;
+
+    env.fullTexelIndex          = env.structure.fullTexelIndex ;
+    env.compressedTexelIndex    = env.structure.compressedTexelIndex ;
+    env.full3dCrdt              = env.structure.full3dCrdt ;
+    env.compressed3dCrdt        = env.structure.compressed3dCrdt ;
+    env.normals                 = env.structure.normals ;
+
+    env.loaded = true ;
+
+    env.allTxtrs = [...env.allTxtrs, 'compressed3dCrdt' ] ;  
+    
+
+/*------------------------------------------------------------------------
+ * zero-flux directionator 
+ *------------------------------------------------------------------------
+ */
+    env.dir0 = new Abubu.Uint32Texture( env.width, env.height ) ;
+    env.dir1 = new Abubu.Uint32Texture( env.width, env.height ) ;
+    env.dir2 = new Abubu.Uint32Texture( env.width, env.height ) ;
+    env.dir3 = new Abubu.Uint32Texture( env.width, env.height ) ;
+    env.dir4 = new Abubu.Uint32Texture( env.width, env.height ) ;
+
+    env.idir0 = env.dir0 ;
+    env.idir1 = env.dir1 ;
+    env.idir2 = env.dir2 ;
+    env.idir3 = env.dir3 ;
+    env.idir4 = env.dir4 ;
+
+    env.directionator = new Abubu.Solver({
+        fragmentShader : source('directionator') ,
+        uniforms : {
+            mx : { type : 'i' , value : env.mx } ,
+            my : { type : 'i' , value : env.my } ,
+            fullTexelIndex : { 
+                type : 't', value : env.fullTexelIndex 
+            } ,
+            compressedTexelIndex : { 
+                type : 't', value : env.compressedTexelIndex
+            } ,
+        },
+        targets: {
+            odir0 : { location : 0, target : env.dir0 } ,
+            odir1 : { location : 1, target : env.dir1 } ,
+            odir2 : { location : 2, target : env.dir2 } ,
+            odir3 : { location : 3, target : env.dir3 } ,
+            odir4 : { location : 4, target : env.dir4 } ,
+        }
+    } ) ;
+    env.directionator.render() ; 
+
+    env.allTxtrs = [...env.allTxtrs, 
+        'idir0', 'idir1', 'idir2','idir3','idir4' ] ;
+
+/*------------------------------------------------------------------------
+ * textures for time-stepping
+ *------------------------------------------------------------------------
+ */
+    env.fcolors = [] ;
+    env.scolors = [] ;
+
+    for(let i=0; i<5; i++){
+        env['fcolor'+i] = new Abubu.Float32Texture( 
+                env.width, env.height, { pairable : true } ) ;
+        env['scolor'+i] = new Abubu.Float32Texture( 
+                env.width, env.height, { pairable : true } ) ;
+        env.fcolors.push(env['fcolor'+i]) ;
+        env.scolors.push(env['scolor'+i]) ;
+    }
+    env.colors = [ ...env.fcolors, ...env.scolors ] ;
+
+/*------------------------------------------------------------------------
+ * TP Targets
+ *------------------------------------------------------------------------
+ */
+    class TpTargets{
+        constructor( colors ){
+            for(let i=0; i<5 ; i++){
+                this["ocolor"+i] = {location : i, target: colors[i]} ;
+            }
+        }
+    }
+
+/*------------------------------------------------------------------------
+ * init solvers
+ *------------------------------------------------------------------------
+ */
+    // init sets 0 to 3 ..................................................
+    env.finit = new Abubu.Solver({
+        fragmentShader : source( 'init' ) ,
+        targets : new TpTargets( env.fcolors ) ,
+    } ) ;
+    env.sinit = new Abubu.Solver({
+        fragmentShader : source( 'init' ) ,
+        targets : new TpTargets( env.scolors ) ,
+    } ) ;
+
+    env.initStates = function(){
+        env.finit.render() ;
+        env.sinit.render() ;
+
+        return ;
+    }
+
+/*------------------------------------------------------------------------
+ * Initiate all coeficients 
+ *------------------------------------------------------------------------
+ */
+    env.running     = false ;
+    env.skip        = 20 ;
+    env.time        = 0. ;
+    
+    // model params
+    env.dt          = 0.05 ;    /* time step size       */
+    env.C_m         = 1. ;      /* cell conductance     */
+    env.lx          = 8.  ;    /* domain size          */
+    env.diffCoef    = 1.e-3 ;   /* diffusion coeficient */
+    env.capacitance = 0.185 ;
+    env.omega       = 0.33 ;
+    env.modelFloats = ['dt' , 'C_m', 'diffCoef', 'lx', 'capacitance' , 'omega'] ;
+
+    env.allFloats   = [...env.allFloats, ...env.modelFloats ] ; 
+   
+    // current multipliers ...............................................
+    env.currentMultipliers = [
+        'C_Na'   ,     'C_NaCa' ,     'C_to'   ,     
+        'C_CaL'  ,     'C_Kr'   ,     'C_Ks'   ,     
+        'C_K1'   ,     'C_NaK'  ,     'C_bNa'  ,     
+        'C_pK'   ,     'C_bCa'  ,     'C_pCa'  ,     
+        'C_leak' ,     'C_up'   ,     'C_rel'  ,     
+        'C_xfer' ] ;
+
+    env.allFloats = [   ...env.allFloats, 
+                        ...env.currentMultipliers ] ;
+    
+    env.cellType = 2 ; // default is endocardial cells
+    env.allInts = [ ...env.allInts, 'cellType' ] ;
+
+    // all float uniforms that need to be initialized with ones ..........
+    env.oneFloats = [
+        ...env.currentMultipliers,  ] ;
+
+    // initialize values to 1.0 ..........................................
+    for(let i in env.oneFloats){
+        let name = env.oneFloats[i] ;
+        env[name] = 1. ;
+    }
+
+    // Common uniforms for comp1 & comp2 solvers .........................
+    class Uniforms{
+        constructor( obj, floats, ints, txtrs){
+            for(let i in floats ){
+                let name    = floats[i] ;
+                this[name]  = { type :'f', value : obj[name] } ;
+            }
+            for(let i in ints){
+                let name    = ints[i] ;
+                this[name]  = { type : 'i', value : obj[name] } ;
+            }
+            for(let name of txtrs){
+                this[name] = { type : 't', value : obj[name] } ;
+            }
+        }
+    }
+
+    // uniforms for comp solvers .........................................
+    class CompUniforms extends Uniforms{
+        constructor( _fc, _sc ){
+            super(env, env.allFloats, env.allInts, env.allTxtrs) ;
+            for(let i=0; i<5 ; i++){
+                this['icolor'+i] = { type : 't', value : _fc[i] } ;
+            }   
+        }
+    }
+
+/*------------------------------------------------------------------------
+ * marching steps 
+ *------------------------------------------------------------------------
+ */
+    // comp solvers ......................................................
+    env.fcomp = new Abubu.Solver({
+        fragmentShader : source('comp') ,
+        uniforms : new CompUniforms( env.fcolors, env.scolors ) ,
+        targets : new TpTargets( env.scolors ) ,
+    } ) ;
+    env.scomp = new Abubu.Solver({
+        fragmentShader : source('comp') ,
+        uniforms : new CompUniforms( env.scolors, env.fcolors ) ,
+        targets : new TpTargets( env.fcolors ) ,
+    } ) ;
+
+
+    env.comps = [ env.fcomp, env.scomp] ;
+    // marches the solution for two time steps ...........................
+    env.march = function(){
+        env.fcomp.render() ;
+        env.scomp.render() ;
+        env.time += 2.*env.dt ;
+    } ;
+
+
+/*========================================================================
+ * surfaceVisualizer 
+ *========================================================================
+ */
+    env.deepv = new Abubu.DeepVoxelizer({
+        input                   : env.fcolor0 ,
+        canvas                  : canvas_1 ,
+        structure               : env.structure ,
+        fovy : 0.51,
+        rotation : [3.31,-3.14,2.29] ,
+        lightDirection : [ 0.6,0.25,-2.06] ,
+        lightSpecularTerm : 0.5, 
+        lightAmbientTerm : 0.1, 
+        materialSpecularTerm : 5.2 ,
+        materialAmbientTerm : 0.1 ,
+        shininess : 10 ,
+        noPasses                : 1. ,
+        minValue                : -40 ,
+        maxValue                : 30 ,
+        voxelSize               : 1.5 ,
+        alpha                   : 1.0 ,
+    } ) ;
+
+/*========================================================================
+ * signal plot 
+ *========================================================================
+ */
+    // signal plot .......................................................
+    env.signalplot = new Abubu.SignalPlot({
+        noPltPoints : 1024,
+        grid : 'on',
+        nx : 5,
+        ny : 12, 
+        xticks : { mode: 'auto', unit : 'ms', font : '11pt Times'} ,
+        yticks : { mode: 'auto', precision:1, unit : 'mv', font : '11pt Times'} ,
+        canvas : env.canvas_2 
+    } ) ;
+
+    env.voltageSignal = env.signalplot.addSignal( env.fcolor0 ,{
+        channel : 'r', 
+        minValue : -90 ,
+        maxValue : 30. ,
+        color :[0.5,0.,0.] ,
+        restValue : -86 ,
+        visible : true ,
+        linewidth : 3,
+        timeWindow: 1000 ,
+        probePosition : [0.5,0.5] ,
+    }) ;
+
+    env.display = function(){
+        if(!env.running){
+            env.clickCopy.render();
+        }
+        env.signalplot.render() ;
+        env.deepv.render() ;
+    }
+
+    // solve or pause simulations ........................................
+    env.solveOrPause = function(){
+        env.running = !env.running ;
+        if (env.running){
+            //env.colorplot.status.text = 'Running...' ;
+        }else{
+            //env.colorplot.status.text = 'Paused!' ;
+        }
+    } 
+
+    // initialize the solution using the solvers .........................
+    env.init = function(){
+        env.time = 0 ;
+        env.signalplot.init(env.time) ;
+        env.initStates() ; 
+        return ;
+    }
+    env.init() ;
+    
+/*------------------------------------------------------------------------
+ * click
+ *------------------------------------------------------------------------
+ */
+    env.click = new Abubu.Solver({
+        fragmentShader : source( 'click' ) ,
+        uniforms : {
+            icolor0 : { type : 't', value : env.fcolor0 } ,
+            compressed3dCrdt : { type : 't', 
+                value : env.structure.compressed3dCrdt            } ,
+            projectedCoordinates : { type : 't', 
+                value : env.deepv.projectedCoordinates  } ,
+            clickPosition : { type : 'v2', value : [0.,0] } ,
+            clickRadius     : { type : 'f', value : 0.1 } ,
+        } ,
+        targets : {
+            ocolor4 : { location : 0 , target : env.scolor0 } ,
+        }
+    } ) ;
+
+    env.clickCopy = new Abubu.Copy( env.scolor0, env.fcolor0 ) ;
+    
+    env.cmndClick = new Abubu.CommandClickListener(
+        canvas_1 , (e) =>{
+            env.deepv.projectCoordinates() ;
+            env.click.uniforms.clickPosition.value = e.position ;
+            env.click.render() ;
+            env.clickCopy.render() ;
+        } , { mousemove : true  } 
+    ) ;
+
+    env.cntrlClick = new Abubu.CtrlClickListener(
+        canvas_1 , (e) =>{
+            env.deepv.projectCoordinates() ;
+            env.click.uniforms.clickPosition.value = e.position ;
+            env.click.render() ;
+            env.clickCopy.render() ;
+        } , { mousemove : true  } 
+    ) ;
+
+    env.shiftClick = new Abubu.ShiftClickListener(
+        canvas_1,
+        (e)=>{
+            env.deepv.projectCoordinates() ;
+            var clickCompPosition = 
+            env.deepv.getCompressedClickPosition(e.position);
+            env.signalplot.setProbePosition( clickCompPosition ) ;
+            env.signalplot.init(env.time) ;
+        } ) ;        
+
+/*------------------------------------------------------------------------
+ * editors
+ *------------------------------------------------------------------------
+ */
+    env.editor = new Abubu.Editor({
+        sources : { 
+            direction : {
+                source : source('directionator') ,
+                solvers: [ env.directionator ],
+                title : 'direction' ,
+                filename: 'directionator.frag' ,
+            } ,
+            comp : { 
+                source : source('comp') , 
+                solvers : [ env.fcomp, env.scomp ] ,
+                title : 'comp' ,
+                filename: 'comp.frag' ,
+            } ,
+    
+            init : { 
+                source : source('init') , 
+                solvers : [ env.finit, env.sinit ] ,
+                title : 'init' ,
+                filename: 'init.frag' ,
+            } ,
+     
+
+        } ,
+        id : 'editor', 
+        active: 'comp' ,
+    } ) ;
+
+    env.toggleEditor = function(){
+        $("#editorSection").fadeToggle(300)
+    } ;
+
+
+/*------------------------------------------------------------------------
+ * createGui
+ *------------------------------------------------------------------------
+ */
+   createGui() ;
+
+/*------------------------------------------------------------------------
+ * rendering the program ;
+ *------------------------------------------------------------------------
+ */
+    env.render = function(){
+        if (env.running){
+            for(let i=0; i<env.skip; i++){
+                env.march() ;
+                env.signalplot.update(env.time) ;
+            }
+        }
+        env.display() ;
+        requestAnimationFrame(env.render) ;
+    }
+
+/*------------------------------------------------------------------------
+ * add environment to document
+ *------------------------------------------------------------------------
+ */
+    document.env = env ;
+
+/*------------------------------------------------------------------------
+ * render the webgl program
+ *------------------------------------------------------------------------
+ */
+    env.render();
+
+}/*  End of loadWebGL  */
+
+/*========================================================================
+ * add multiple parameters to the GUI
+ *========================================================================
+ */ 
+function addToGui( 
+        guiElemenent ,  // gui element to add options into
+        obj,            // object that holds parameters
+        paramList,      // array of strings that contains list 
+                        // of parmeters to be added
+        solverList      // array of solvers that need to be update upon 
+                        // change of a parameter through gui interactions
+    ){
+    let elements = {} ;
+    for(let param of paramList){
+        elements[param] = 
+            guiElemenent.add(obj, param ).onChange( ()=> {
+                Abubu.setUniformInSolvers( 
+                    param, obj[param], solverList ) ;
+            } ) ;
+    }
+    return elements ;
+}
+/*========================================================================
+ * addVectorToGui
+ *========================================================================
+ */
+function addVectorToGui(
+    guiElem, 
+    obj, 
+    param , opts){
+    let elems = [] ;
+    let labels = opts?.labels ?? 'XYZW' ;
+
+    for (var i=0 ; i< obj[param].length ; i++){
+        elems.push(guiElem.add( obj[param] , i.toString() )
+            .name( param + ' ' + labels[i] ) );
+       elems[i].onChange( ()=>{ obj[param] = obj[param] } ) ;
+        if ( opts?.callback ){
+            elems[i].onChange( ()=>{ 
+                    obj[param] = obj[param];
+                    opts.callback();
+                }   ) ;
+        }
+
+        if ( opts?.min ){
+            elems[i].min( opts.min ) ;
+        }
+        if ( opts?.max ){
+            elems[i].max( opts.max ) ;
+        }
+        if ( opts?.step ){
+            elems[i].step( opts.step ) ;
+        }
+         
+    }
+    return elems ;
+}
+/*========================================================================
+ * createGui
+ *========================================================================
+ */
+function createGui(){
+    env.gui = new Abubu.Gui() ;
+    env.gui.pnl1 = env.gui.addPanel({width:300}) ;
+    let pnl1 = env.gui.pnl1 ;
+    
+    // model .............................................................
+    pnl1.f0 = pnl1.addFolder('Model Info') ;
+    let solvs = [ env.fcomp, env.scomp] ;
+    addToGui( pnl1.f0, env, env.modelFloats, solvs ) ;
+    pnl1.f0_1 = pnl1.f0.addFolder( 'Current Multipliers'    ) ;
+    addToGui( pnl1.f0_1, env, env.currentMultipliers, solvs ) ;
+
+    // display -----------------------------------------------------------
+    pnl1.f1 = pnl1.addFolder('Display') ;
+    pnl1.deepv = env.deepv.controlByGui( pnl1.f1) ;
+
+    pnl1.f1.add(env, 'skip' ) ;
+    pnl1.f1.open() ;
+    
+    // source code editors ...............................................
+    pnl1.f2  = pnl1.addFolder('Edit/Save/Load Source Code') ;
+    pnl1.f2.add( env , 'toggleEditor').name('Show/Hide Editor' ) ;
+    pnl1.f2.add( env.editor , 'title', env.editor.titles )
+        .name('Edit source').onChange( ()=>{ pnl1.updateDisplay() ;} ) ;
+    pnl1.f2.add( env.editor , 'filename').name('Filename') ;
+    pnl1.f2.add( env.editor , 'save' ).name('Save to file') ;
+    pnl1.f2.add( env.editor , 'load' ).name('Load from file') ;
+
+    // simulation ........................................................
+    pnl1.f3 = pnl1.addFolder('Simulation') ;
+    pnl1.f3.add(env, 'init' ).name('Initialize Solution') ;
+    pnl1.f3.add(env, 'solveOrPause').name('Solve/Pause') ;
+    pnl1.f3.add(env, 'time').name('Solution Time [ms]').listen() ;
+    pnl1.f3.open() ;
+    return ;
+} /* End of createGui */
+</script>
+
+
+</body>
+</html>
+
