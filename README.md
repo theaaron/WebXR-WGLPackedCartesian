@@ -43,7 +43,7 @@ You can directly run the programs in this package by visiting [WGLPackedCartesia
 
 Alternatively, you can clone this repository to your local disk by issuing the following command on the command line:
 ```bash
-git clone https://osel-dbp.github.io/WGLPackedCartesian/
+git clone https://github.com/dbp-osel/WGLPackedCartesian
 ```
 
 This will create a copy of the repository on your local disk, which you can then run the programs from. Navigate to the root directory of the repository on your local drive, and open the file ``index.html`` in a web browser that supports WebGL 2.0 such as the Google Chrome browser. You can click on each program link in your browser to open the program that you want to run. 
