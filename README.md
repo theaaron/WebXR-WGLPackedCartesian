@@ -39,7 +39,7 @@ An internet connection is required to load the above-mentioned libraries at each
 ## Instructions to run the programs in this package
 
 ### Running each program of the package 
-You can directly run the programs in this package by visiting [WGLPackedCartesian](https://osel-dbp.github.io/WGLPackedCartesian/), and clicking on the link for the program that you want to run.
+You can directly run the programs in this package by visiting [WGLPackedCartesian](https://dbp-osel.github.io/WGLPackedCartesian/), and clicking on the link for the program that you want to run.
 
 Alternatively, you can clone this repository to your local disk by issuing the following command on the command line:
 ```bash
