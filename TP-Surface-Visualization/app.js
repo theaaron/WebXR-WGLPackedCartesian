@@ -51,8 +51,11 @@ fileInput.onchange = function(){
   } ;
 }
 
+var gl = Abubu.gl ;
+
 /*========================================================================
- * read from file on the server
+ * Read structure from file on the server for debugging purposes
+ * NOTE: if not debugging comment out this section
  *========================================================================
  */
 //let structureFile = new XMLHttpRequest();
@@ -61,13 +64,158 @@ fileInput.onchange = function(){
 //    if (structureFile.readyState == 4 && structureFile.status == 200) {
 //        loadedJSON = JSON.parse(structureFile.responseText);
 //        console.log(loadedJSON) ;
+//        $('#chooser').hide() ;
+//        $('.loaded').show() ;
+//
 //        loadWebGL() ;
 //    }
 //};
 //console.log("324") ;
-//structureFile.open("GET", "jsons/01-350um-128-128-128.json", true);
+//structureFile.open("GET", 
+//        "/jsons/AtrialExamples/02-350um-192x192x192_lra_grid.json", true);
 //structureFile.send();
-var gl = Abubu.gl ;
+//
+
+/*========================================================================
+ * WallTime
+ *========================================================================
+ */
+class WallTimer{
+    constructor(opts={}){
+        this._duration  = opts?.duration ?? 100 ; /* duration of the
+                                        measurements in miliseconds of
+                                        simulated electrical activity   */
+        this._start     = opts?.start ?? 0 ; /* physical time of the
+                                                measurements            */
+                                             
+        this._startTime = new Date().getTime() ;    /* start wall-time of
+                                                       the measurements */
+        this._endTime   = NaN ;
+        this._started   = false;    /* flag that wall-time 
+                                       measurements have started        */
+        this._finished  = false ;   /* flag indicating if wall-time
+                                       measurements have ended          */
+        this._paused    = false ;    /* flag indicating if measurements 
+                                       are paused                       */
+        this._lapsedTime= 0 ;       /* lapsed time of the wall-time
+                                       measurements                     */
+    }// end of constructor ...............................................
+
+/*------------------------------------------------------------------------
+ * getters and setters of the class
+ *------------------------------------------------------------------------
+ */
+    get duration(){
+        return this._duration ; 
+    }
+
+    set duration(v){
+        this._duration = v ;
+        this.reset() ;
+    }
+
+    get paused(){
+        return this._paused ;
+    }
+
+    set paused(v){
+        if (v & !this.paused & !this.finished){
+            this.endTime = new Date().getTime() ;
+            this._started = false ;
+            this._lapsedTime += (this.endTime - this.startTime) ;
+            this._paused = v ;
+        }else if ( !v ){
+            this._paused = v ;
+        }
+        return ;
+    }
+    
+    get start(){
+        return this._start ;
+    }
+
+    set start(v){
+        this._start = v ;
+    }
+
+    get startTime(){
+        return this._startTime ;
+    }
+
+    set startTime(v){
+        this._startTime = v ;
+    }
+
+    get endTime(){
+        return this._endTime ;
+    }
+
+    set endTime(v){
+        this._endTime =v  ;
+    }
+
+    get lapsedTime(){
+        return this._lapsedTime ;
+    }
+
+    get finished(){
+        return this._finished ;
+    }
+    set finished(v){
+        this._finished = v ;
+    }
+
+    get started(){
+        return this._started ;
+    }
+
+    set started(v){
+        this._started = v ;
+    }
+
+    get end(){
+        return this.start + this.duration ;
+    }
+
+    get progress(){
+        if (this.finished) return 100 ;
+        return Math.round(100*( env.time - this.start)/this.duration) ;
+    }
+
+/*------------------------------------------------------------------------
+ * Methods
+ *------------------------------------------------------------------------
+ */
+    // Measure wall-time .................................................
+    measure(){
+        if ( !env.running & !this.paused ){
+            this.paused  = true ;
+            return ;
+        }
+        if ( !env.running ) return ;
+
+        if ( !this.started & !this.paused & env.time >= this.start ){
+            this.started = true ;
+            this.startTime = new Date().getTime() ; 
+            return ;
+        }
+        
+        if ( !this.finished & !this.paused & env.time >= this.end ){
+            this.finished = true ;
+            this._endTime = new Date().getTime() ;
+            this._lapsedTime += (this.endTime - this.startTime) ;
+        }
+    }
+
+    // Reset measurements ................................................
+    reset(){
+        this._started       = false ;
+        this.start          = env.time ;
+        this._finished      = false ;
+        this._lapsedTime   = 0 ;
+    }
+}
+
 /*========================================================================
  * Initialization of the GPU and Container
  *========================================================================
@@ -209,7 +357,11 @@ function loadWebGL()
     // model params
     env.dt          = 0.05 ;    /* time step size       */
     env.C_m         = 1. ;      /* cell conductance     */
-    env.lx          = 8.  ;     /* domain size          */
+    if (loadedJSON?.length){
+        env.lx = loadedJSON.length/10 ;
+    }else{
+        env.lx = 8.  ;
+    }
     env.diffCoef    = 1.e-3 ;   /* diffusion coeficient */
     env.capacitance = 0.185,
     env.modelFloats = ['dt' , 'C_m', 'diffCoef', 'lx', 'capacitance' ] ;
@@ -350,9 +502,14 @@ function loadWebGL()
         env.signalplot.render() ;
     }
 
+    // wall Timer ........................................................
+    env.wallTimer = new WallTimer() ;
+
     // solve or pause simulations ........................................
     env.solveOrPause = function(){
         env.running = !env.running ;
+        env.wallTimer.paused = !env.running ;
+
         if (env.running){
             //env.colorplot.status.text = 'Running...' ;
         }else{
@@ -363,6 +520,7 @@ function loadWebGL()
     // initialize the solution using the solvers .........................
     env.init = function(){
         env.time = 0 ;
+        env.wallTimer.reset() ;
         env.signalplot.init(env.time) ;
         env.initStates() ; 
         return ;
@@ -466,6 +624,7 @@ function loadWebGL()
     env.render = function(){
         if (env.running){
             for(let i=0; i<env.skip; i++){
+                env.wallTimer.measure() ;
                 env.march() ;
                 env.signalplot.update(env.time) ;
             }
@@ -561,6 +720,13 @@ function createGui(){
     pnl1.f0_1 = pnl1.f0.addFolder( 'Current Multipliers'    ) ;
     addToGui( pnl1.f0_1, env, env.currentMultipliers, solvs ) ;
 
+    // wall-time measurements --------------------------------------------
+    pnl1.f4 = pnl1.addFolder('Wall time measurements') ;
+    pnl1.f4.add(env.wallTimer, 'duration').name('Sim. Activity [ms]') ; 
+    pnl1.f4.add(env.wallTimer, 'progress').name("Progress [%]").listen() ;
+    pnl1.f4.add(env.wallTimer, 'lapsedTime').name("Measured Walltime [ms]").listen() ; 
+    pnl1.f4.add(env.wallTimer, 'reset').name('Reset') ; 
+ 
     // display -----------------------------------------------------------
     pnl1.f1 = pnl1.addFolder('Display') ;
     pnl1.visurf = env.visurf.controlByGui( pnl1.f1) ;

@@ -15,17 +15,19 @@ th,td{
 </head>
 <body>
     <h1>WGLPackedCartesian</h1>
-    <p>This package is a new series of WebGL programs that can be used to model ventricular or atrial electrical activity on three-dimensional geometries of anatomical structures. The codes use three-dimensional, uniform Cartesian grid point clouds of the 3D tissue as input.</p>
+    <p>This package is a series of WebGL programs that can be used to
+    model ventricular or atrial electrical activity on three-dimensional
+    geometries of anatomical structures. The programs use three-dimensional, uniform Cartesian grid point clouds of the 3D tissue as input.</p>
 <p>The sparsity of the tissue domain is addressed through a compression algorithm, which accelerates the programs by:</p>
 <ul>
 <li>Conserving GPU memory</li>
 <li>Avoiding unnecessary input/output to and from the empty space</li>
 <li>Balancing the load on GPU cores</li>
 </ul>
-<p>For more information on these programs, and how to run them, see the README.md file at <a href="https://github.com/dbp-osel/WGLPackedCartesian">https://github.com/dbp-osel/WGLPackedCartesian</a>.</p>
+<p>For more information on these programs, and how to run them, see the README.md file at <a href="github address">the package github page.</a></p>
 
 <p>You can access these programs by visiting the links provided below.</p>
-    <h2>Models without Cross-Diagonal Terms</h2>
+    <h2>Models without Cross-Diagonal Terms with Compression Algorithm</h2>
     <table>
         <tr><th>Surface Visualization (SV)</th><th>Voxel Visualization (VV)</th></tr>
                 
@@ -44,7 +46,7 @@ th,td{
         <tr><td></td>
            <td><a href='./Atrial-Ablation/index.html'>Atrial Ablation Simulation</td></tr>
     </table>
-    <h2>Models with Cross-Diagonal Terms</h2>
+    <h2>Models with Cross-Diagonal Terms with Compression Algorithm</h2>
     <table>
         <tr><th>Surface Visualization (SV)</th><th>Voxel Visualization (VV)</th></tr>
         
@@ -61,9 +63,27 @@ th,td{
             <td><a href='./OVVR-Voxelizer-Cross-Diagonal-Terms/index.html'>OVVR Ventricular Model (SV)</a></td></tr>
         
     </table>
+    <h2>Models with Cross-Diagonal Terms with NO Compression</h2>
+    <p>The implementations in this section use the full size domain without any compression used for solving the cable equation in 3D. These models are provided as reference to their compressed counter-parts to demonstrate the computational demand that is imposed if the above compression algorithm is not utilized.</p>
+    <table>
+        <tr><th>Surface Visualization (SV)</th><th>Voxel Visualization (VV)</th></tr>
+        <tr><td><a href='./Atrial-MM-Surface-Visualization-Cross-Diagonal-Terms-unpacked/index.html'>Atrial Minimal Model (SV)</a></td>
+        <td><a href='./Atrial-MM-Voxelizer-Cross-Diagonal-Terms-unpacked/index.html'>Atrial Minimal Model (VV)</a></td></tr>
+ 
+        <tr><td><a href='./Master-MM-Surface-Visualization-Cross-Diagonal-Terms-unpacked/index.html'>Minimal Model (SV)</a></td>
+            <td><a href='./Master-MM-Voxelizer-Cross-Diagonal-Terms-unpacked/index.html'>Minimal Model (VV)</a></td></tr>
+
+        <tr><td><a href='./TP-Surface-Visualization-Cross-Diagonal-Terms-unpacked/index.html'>TP Ventricular Model (SV)</a></td>
+            <td><a href='./TP-Voxelizer-Cross-Diagonal-Terms-unpacked/index.html'>TP Ventricular Model (VV)</a></td></tr>
+
+        <tr><td><a href='./OVVR-Surface-Visualization-Cross-Diagonal-Terms-unpacked/index.html'>OVVR Ventricular Model (SV)</a></td>
+            <td><a href='./OVVR-Voxelizer-Cross-Diagonal-Terms-unpacked/index.html'>OVVR Ventricular Model (SV)</a></td></tr>
+
+
+    </table>
     <h2>Supplemental Material</h2>
     <h3>Sample Grids</h3>
     <p>You can download the grid samples from <a href="./GridSamples.zip">from this link.</a></p>
     <h3>Source Codes</h3>
-    <p>You can download and see all the source codes from <a href="https://github.com/dbp-osel/WGLPackedCartesian">from this link</a>.</p>
+    <p>You can download and see all the source codes from <a href="address-goes-here">from this link</a>.</p>
 </body>
