@@ -743,7 +743,7 @@ function loadWebGL()
                     .toString()
                     .padStart(7,'0')+'.png') ;
         } ,
-        active : true ,
+        active : false ,
     } ) ;
 
 /*------------------------------------------------------------------------
@@ -759,7 +759,6 @@ function loadWebGL()
     env.render = function(){
         if (env.running){
             for(let i=0; i<env.skip; i++){
-                env.intervalCaller.call(env.time) ;
                 env.wallTimer.measure() ;
                 env.fcomp.render() ;
                 env.scomp.render() ;
