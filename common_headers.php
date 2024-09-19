@@ -2,7 +2,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
 <!-- Online libraries and dependencies -->
-<script src='https://abubujs.org/libs/Abubu.latest.js'
+<script src='https://kaboudian.github.io/abubujs/libs/Abubu.latest.js'
 	    type='text/javascript'></script>
 <script 
 src='https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/ace.js'  
