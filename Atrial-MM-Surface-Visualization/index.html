@@ -1583,15 +1583,19 @@ function createVRButton() {
     const button = document.createElement('button');
     button.textContent = "Enter VR";
     button.style.position = 'fixed';
-    button.style.top = '20px';
-    button.style.right = '20px';
-    button.style.zIndex = '1000';
-    button.style.padding = '10px 20px';
+    button.style.bottom = '20px';
+    button.style.left = '50%';
+    button.style.transform = 'translateX(-50%)';
+    button.style.zIndex = '1001';
+    button.style.padding = '15px 30px';
     button.style.backgroundColor = '#4CAF50';
     button.style.color = 'white';
     button.style.border = 'none';
-    button.style.borderRadius = '5px';
+    button.style.borderRadius = '8px';
     button.style.cursor = 'pointer';
+    button.style.fontSize = '16px';
+    button.style.fontWeight = 'bold';
+    button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
     
     button.addEventListener('click', enterVR);
     document.body.appendChild(button);
