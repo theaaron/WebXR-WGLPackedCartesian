@@ -1608,14 +1608,14 @@ function createVRSurfaceVisualizer() {
     vrCanvas.width = 1024; // VR typically needs higher resolution
     vrCanvas.height = 1024;
     
-    // Create a VR-compatible surface visualizer with fixed position
+    // Create a VR-compatible surface visualizer with fixed world position
     vrSurfaceVisualizer = new Abubu.SurfaceVisualizer({
         canvas: vrCanvas,
         target: env.fcolor0,
         structure: env.structure,
         fovy: 0.8, // Wider FOV for VR
         rotation: [...env.visurf.rotation],
-        translation: [0, 0, -3], // Fixed position 3 units in front of user
+        translation: [0, 0, -3], // Fixed position 3 units in front of origin
         scaling: [...env.visurf.scaling],
         lightDirection: [...env.visurf.lightDirection],
         lightSpecularTerm: env.visurf.lightSpecularTerm,
@@ -1652,6 +1652,13 @@ function createVRSurfaceVisualizer() {
 async function enterVR() {
     try {
         console.log('Attempting to enter VR...');
+        
+        // Check if heart structure is loaded
+        if (!env.structure || !env.fcolor0) {
+            console.error('Heart structure not loaded! Please load a JSON file first.');
+            alert('Please load a heart structure file before entering VR.');
+            return;
+        }
         
         // Make the WebGL context XR compatible
         await gl.makeXRCompatible();
@@ -1690,7 +1697,13 @@ async function enterVR() {
         hideWebpageForVR();
         
         // Create VR surface visualizer
+        console.log('Creating VR surface visualizer...');
         createVRSurfaceVisualizer();
+        
+        if (!vrSurfaceVisualizer) {
+            throw new Error('Failed to create VR surface visualizer');
+        }
+        console.log('VR surface visualizer created successfully');
         
         // Pause the normal render loop
         if (env.running) {
@@ -1698,6 +1711,7 @@ async function enterVR() {
         }
         
         // Start the VR render loop
+        console.log('Starting VR render loop...');
         vrRenderLoop = xrSession.requestAnimationFrame(renderVR);
         
         console.log('VR session started successfully');
@@ -1705,6 +1719,7 @@ async function enterVR() {
     } catch (error) {
         console.error('Error entering VR:', error);
         isVRActive = false;
+        alert('Failed to enter VR: ' + error.message);
     }
 }
 
@@ -1722,11 +1737,18 @@ function renderVR(time, frame) {
             // Bind the XR framebuffer
             gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
             
-            // Clear the framebuffer
+            // Clear the framebuffer with a visible background
+            gl.clearColor(0.2, 0.2, 0.2, 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             
             // Handle controller input
             handleControllerInput(frame);
+            
+            // Debug: Check if heart structure exists
+            if (!vrSurfaceVisualizer) {
+                console.error('VR Surface Visualizer is null!');
+                return;
+            }
             
             // Render for each view (left and right eye)
             for (const view of pose.views) {
@@ -1738,7 +1760,14 @@ function renderVR(time, frame) {
                 
                 // Render the surface visualization in VR
                 renderSurfaceInVR();
+                
+                // Debug: Log successful render
+                if (Math.random() < 0.01) {
+                    console.log('VR frame rendered successfully');
+                }
             }
+        } else {
+            console.error('No pose available in VR render loop');
         }
         
         // Continue the VR render loop
@@ -1746,6 +1775,7 @@ function renderVR(time, frame) {
         
     } catch (error) {
         console.error('Error in VR render loop:', error);
+        console.error('Error details:', error.stack);
         exitVR();
     }
 }
@@ -1756,17 +1786,22 @@ function updateVRCamera(view, pose) {
         const projectionMatrix = view.projectionMatrix;
         
         if (vrSurfaceVisualizer) {
+            // Set the projection matrix for VR
             vrSurfaceVisualizer.projectionMatrix = projectionMatrix;
             vrSurfaceVisualizer.surfaceView.uniforms.projectionMatrix.value = projectionMatrix;
             
+            // Set the view matrix for VR (this is the camera position/orientation)
             vrSurfaceVisualizer.viewMatrix = viewMatrix;
             vrSurfaceVisualizer.surfaceView.uniforms.viewMatrix.value = viewMatrix;
             
+            // Update the normal matrix for proper lighting
             vrSurfaceVisualizer.updateNormalMatrix();
             
-            if (Math.random() < 0.01) { 
+            // Debug logging (reduced frequency)
+            if (Math.random() < 0.001) { 
                 console.log('VR View Matrix:', viewMatrix);
-                console.log('VR Translation:', vrSurfaceVisualizer.translation);
+                console.log('VR Projection Matrix:', projectionMatrix);
+                console.log('VR Heart Position:', vrSurfaceVisualizer.translation);
             }
         }
     } catch (error) {
@@ -1777,7 +1812,15 @@ function updateVRCamera(view, pose) {
 function renderSurfaceInVR() {
     try {
         if (vrSurfaceVisualizer && vrSurfaceVisualizer.render) {
+            // Ensure the heart is visible by setting a background color
+            gl.clearColor(0.1, 0.1, 0.1, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // Render the heart structure
             vrSurfaceVisualizer.render();
+            
+            // Reset clear color
+            gl.clearColor(0, 0, 0, 1.0);
         }
     } catch (error) {
         console.error('Error rendering surface in VR:', error);
