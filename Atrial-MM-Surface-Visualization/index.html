@@ -26,6 +26,9 @@ type="text/javascript" charset="utf-8">
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
 
+<!-- Add this in the head section, after the existing scripts -->
+<script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.min.js"></script>
+
 <style>
 
 /* unvisited link */
@@ -1541,6 +1544,499 @@ function createGui(){
     pnl1.f3.open() ;
     return ;
 } /* End of createGui */
+
+/*========================================================================
+ * WebXR session management
+ *========================================================================
+ */
+let vrSupported = false;
+let isVRActive = false;
+let xrSession = null;
+let xrRefSpace = null;
+let vrRenderLoop = null;
+let vrSurfaceVisualizer = null;
+let vrControllers = [];
+let isRotating = false;
+let rotationSpeed = 0.02;
+
+async function checkVRSupport() {
+    try {
+        // Check if WebXR is supported
+        if ('xr' in navigator) {
+            vrSupported = await navigator.xr.isSessionSupported('immersive-vr');
+            console.log('Immersive VR supported:', vrSupported);
+            
+            if (vrSupported) {
+                createVRButton();
+            } else {
+                console.log('VR not supported on this device');
+            }
+        } else {
+            console.log('WebXR not supported in this browser');
+        }
+    } catch (error) {
+        console.error('Error checking VR support:', error);
+    }
+}
+
+function createVRButton() {
+    const button = document.createElement('button');
+    button.textContent = "Enter VR";
+    button.style.position = 'fixed';
+    button.style.top = '20px';
+    button.style.right = '20px';
+    button.style.zIndex = '1000';
+    button.style.padding = '10px 20px';
+    button.style.backgroundColor = '#4CAF50';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+    
+    button.addEventListener('click', enterVR);
+    document.body.appendChild(button);
+}
+
+// Create a VR-compatible surface visualizer
+function createVRSurfaceVisualizer() {
+    // Create a temporary canvas for VR rendering
+    const vrCanvas = document.createElement('canvas');
+    vrCanvas.width = 1024; // VR typically needs higher resolution
+    vrCanvas.height = 1024;
+    
+    // Create a VR-compatible surface visualizer with fixed position
+    vrSurfaceVisualizer = new Abubu.SurfaceVisualizer({
+        canvas: vrCanvas,
+        target: env.fcolor0,
+        structure: env.structure,
+        fovy: 0.8, // Wider FOV for VR
+        rotation: [...env.visurf.rotation],
+        translation: [0, 0, -3], // Fixed position 3 units in front of user
+        scaling: [...env.visurf.scaling],
+        lightDirection: [...env.visurf.lightDirection],
+        lightSpecularTerm: env.visurf.lightSpecularTerm,
+        lightAmbientTerm: env.visurf.lightAmbientTerm,
+        materialSpecularTerm: env.visurf.materialSpecularTerm,
+        materialAmbientTerm: env.visurf.materialAmbientTerm,
+        shininess: env.visurf.shininess,
+        minValue: env.visurf.minValue,
+        maxValue: env.visurf.maxValue,
+        colormap: env.visurf.colormap
+    });
+    
+    // Override the render method to render to XR framebuffer
+    const originalRender = vrSurfaceVisualizer.render;
+    vrSurfaceVisualizer.render = function() {
+        // Update matrices
+        this.updateViewMatrix();
+        this.updateNormalMatrix();
+        
+        // Clear the target textures
+        this.surfaceViewTarget.clear(0,0,0,0);
+        
+        // Render the scene to textures
+        this.surfaceView.render();
+        
+        // Instead of blending to canvas, render directly to current framebuffer
+        // (which should be the XR framebuffer in VR mode)
+        this.surfaceViewBlend.render();
+    };
+    
+    return vrSurfaceVisualizer;
+}
+
+async function enterVR() {
+    try {
+        console.log('Attempting to enter VR...');
+        
+        // Make the WebGL context XR compatible
+        await gl.makeXRCompatible();
+        console.log('WebGL context made XR compatible');
+        
+        // Request VR session with only supported features
+        const sessionOptions = {
+            optionalFeatures: ['local-floor']
+        };
+        
+        xrSession = await navigator.xr.requestSession('immersive-vr', sessionOptions);
+        console.log('VR session created');
+        
+        // Create XR layer
+        const layer = new XRWebGLLayer(xrSession, gl);
+        xrSession.updateRenderState({ baseLayer: layer });
+        console.log('XR layer created');
+        
+        // Get reference space
+        xrRefSpace = await xrSession.requestReferenceSpace('local');
+        console.log('Reference space created');
+        
+        // Set up session event handlers
+        xrSession.addEventListener('end', exitVR);
+        xrSession.addEventListener('selectstart', onSelectStart);
+        xrSession.addEventListener('selectend', onSelectEnd);
+        xrSession.addEventListener('squeezestart', onSqueezeStart);
+        xrSession.addEventListener('squeezeend', onSqueezeEnd);
+        
+        // Set up controller input sources
+        xrSession.addEventListener('inputsourceschange', onInputSourcesChange);
+        
+        isVRActive = true;
+        
+        // Hide the webpage for immersive VR experience
+        hideWebpageForVR();
+        
+        // Create VR surface visualizer
+        createVRSurfaceVisualizer();
+        
+        // Pause the normal render loop
+        if (env.running) {
+            env.solveOrPause(); // Pause simulation
+        }
+        
+        // Start the VR render loop
+        vrRenderLoop = xrSession.requestAnimationFrame(renderVR);
+        
+        console.log('VR session started successfully');
+        
+    } catch (error) {
+        console.error('Error entering VR:', error);
+        isVRActive = false;
+    }
+}
+
+function renderVR(time, frame) {
+    if (!isVRActive || !frame) {
+        console.log('VR render loop stopped');
+        return;
+    }
+    
+    try {
+        const pose = frame.getViewerPose(xrRefSpace);
+        if (pose) {
+            const layer = xrSession.renderState.baseLayer;
+            
+            // Bind the XR framebuffer
+            gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+            
+            // Clear the framebuffer
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // Handle controller input
+            handleControllerInput(frame);
+            
+            // Render for each view (left and right eye)
+            for (const view of pose.views) {
+                const viewport = layer.getViewport(view);
+                gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                
+                // Update camera matrices for this view
+                updateVRCamera(view, pose);
+                
+                // Render the surface visualization in VR
+                renderSurfaceInVR();
+            }
+        }
+        
+        // Continue the VR render loop
+        vrRenderLoop = xrSession.requestAnimationFrame(renderVR);
+        
+    } catch (error) {
+        console.error('Error in VR render loop:', error);
+        exitVR();
+    }
+}
+
+function updateVRCamera(view, pose) {
+    try {
+        const viewMatrix = view.transform.matrix;
+        const projectionMatrix = view.projectionMatrix;
+        
+        if (vrSurfaceVisualizer) {
+            vrSurfaceVisualizer.projectionMatrix = projectionMatrix;
+            vrSurfaceVisualizer.surfaceView.uniforms.projectionMatrix.value = projectionMatrix;
+            
+            vrSurfaceVisualizer.viewMatrix = viewMatrix;
+            vrSurfaceVisualizer.surfaceView.uniforms.viewMatrix.value = viewMatrix;
+            
+            vrSurfaceVisualizer.updateNormalMatrix();
+            
+            if (Math.random() < 0.01) { 
+                console.log('VR View Matrix:', viewMatrix);
+                console.log('VR Translation:', vrSurfaceVisualizer.translation);
+            }
+        }
+    } catch (error) {
+        console.error('Error updating VR camera:', error);
+    }
+}
+
+function renderSurfaceInVR() {
+    try {
+        if (vrSurfaceVisualizer && vrSurfaceVisualizer.render) {
+            vrSurfaceVisualizer.render();
+        }
+    } catch (error) {
+        console.error('Error rendering surface in VR:', error);
+    }
+}
+
+function onInputSourcesChange(event) {
+    for (const inputSource of event.added) {
+        console.log('Controller connected:', inputSource.handedness);
+        vrControllers.push(inputSource);
+    }
+    
+    for (const inputSource of event.removed) {
+        console.log('Controller disconnected:', inputSource.handedness);
+        const index = vrControllers.indexOf(inputSource);
+        if (index > -1) {
+            vrControllers.splice(index, 1);
+        }
+    }
+}
+
+function onSelectStart(event) {
+    console.log('VR select start');
+    isRotating = true;
+}
+
+function onSelectEnd(event) {
+    console.log('VR select end');
+    isRotating = false;
+}
+
+function onSqueezeStart(event) {
+    console.log('VR squeeze start');
+    isRotating = true;
+}
+
+function onSqueezeEnd(event) {
+    console.log('VR squeeze end');
+    isRotating = false;
+}
+
+function hideWebpageForVR() {
+    const body = document.body;
+    const style = body.style;
+    
+    if (!body.dataset.originalBackground) {
+        body.dataset.originalBackground = style.backgroundColor;
+        body.dataset.originalColor = style.color;
+    }
+    
+    // Hide webpage elements but keep GUI accessible
+    const elementsToHide = document.querySelectorAll('h1, h2, h3, h4, p, table, .loaded, #chooser');
+    elementsToHide.forEach(element => {
+        if (!element.dataset.originalDisplay) {
+            element.dataset.originalDisplay = element.style.display;
+        }
+        element.style.display = 'none';
+    });
+    
+    // Position GUI for VR instead of hiding it
+    if (env.gui && env.gui.domElement) {
+        if (!env.gui.domElement.dataset.originalPosition) {
+            env.gui.domElement.dataset.originalPosition = env.gui.domElement.style.position;
+            env.gui.domElement.dataset.originalTop = env.gui.domElement.style.top;
+            env.gui.domElement.dataset.originalRight = env.gui.domElement.style.right;
+            env.gui.domElement.dataset.originalZIndex = env.gui.domElement.style.zIndex;
+            env.gui.domElement.dataset.originalBackground = env.gui.domElement.style.backgroundColor;
+            env.gui.domElement.dataset.originalColor = env.gui.domElement.style.color;
+            env.gui.domElement.dataset.originalBorder = env.gui.domElement.style.border;
+            env.gui.domElement.dataset.originalBorderRadius = env.gui.domElement.style.borderRadius;
+            env.gui.domElement.dataset.originalPadding = env.gui.domElement.style.padding;
+            env.gui.domElement.dataset.originalMaxHeight = env.gui.domElement.style.maxHeight;
+            env.gui.domElement.dataset.originalOverflowY = env.gui.domElement.style.overflowY;
+        }
+        
+        // Position GUI for VR
+        env.gui.domElement.style.position = 'fixed';
+        env.gui.domElement.style.top = '20px';
+        env.gui.domElement.style.right = '20px';
+        env.gui.domElement.style.zIndex = '1000';
+        env.gui.domElement.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        env.gui.domElement.style.color = 'white';
+        env.gui.domElement.style.border = '1px solid #444';
+        env.gui.domElement.style.borderRadius = '5px';
+        env.gui.domElement.style.padding = '10px';
+        env.gui.domElement.style.maxHeight = '80vh';
+        env.gui.domElement.style.overflowY = 'auto';
+        env.gui.domElement.style.display = 'block';
+        
+        // Make GUI text more readable in VR
+        const guiTexts = env.gui.domElement.querySelectorAll('*');
+        guiTexts.forEach(element => {
+            if (element.style) {
+                element.style.color = 'white';
+                element.style.fontSize = '14px';
+            }
+        });
+    }
+    
+    style.backgroundColor = '#000000';
+    style.color = '#ffffff';
+    
+    console.log('Webpage hidden for VR, GUI positioned for VR');
+}
+
+function showWebpageAfterVR() {
+    const body = document.body;
+    const style = body.style;
+    
+    if (body.dataset.originalBackground) {
+        style.backgroundColor = body.dataset.originalBackground;
+        delete body.dataset.originalBackground;
+    }
+    if (body.dataset.originalColor) {
+        style.color = body.dataset.originalColor;
+        delete body.dataset.originalColor;
+    }
+    
+    const elementsToShow = document.querySelectorAll('h1, h2, h3, h4, p, table, .loaded, #chooser');
+    elementsToShow.forEach(element => {
+        if (element.dataset.originalDisplay !== undefined) {
+            element.style.display = element.dataset.originalDisplay;
+            delete element.dataset.originalDisplay;
+        }
+    });
+    
+    // Restore original GUI styling
+    if (env.gui && env.gui.domElement) {
+        if (env.gui.domElement.dataset.originalPosition !== undefined) {
+            env.gui.domElement.style.position = env.gui.domElement.dataset.originalPosition;
+            env.gui.domElement.style.top = env.gui.domElement.dataset.originalTop;
+            env.gui.domElement.style.right = env.gui.domElement.dataset.originalRight;
+            env.gui.domElement.style.zIndex = env.gui.domElement.dataset.originalZIndex;
+            env.gui.domElement.style.backgroundColor = env.gui.domElement.dataset.originalBackground;
+            env.gui.domElement.style.color = env.gui.domElement.dataset.originalColor;
+            env.gui.domElement.style.border = env.gui.domElement.dataset.originalBorder;
+            env.gui.domElement.style.borderRadius = env.gui.domElement.dataset.originalBorderRadius;
+            env.gui.domElement.style.padding = env.gui.domElement.dataset.originalPadding;
+            env.gui.domElement.style.maxHeight = env.gui.domElement.dataset.originalMaxHeight;
+            env.gui.domElement.style.overflowY = env.gui.domElement.dataset.originalOverflowY;
+            
+            // Clear stored values
+            delete env.gui.domElement.dataset.originalPosition;
+            delete env.gui.domElement.dataset.originalTop;
+            delete env.gui.domElement.dataset.originalRight;
+            delete env.gui.domElement.dataset.originalZIndex;
+            delete env.gui.domElement.dataset.originalBackground;
+            delete env.gui.domElement.dataset.originalColor;
+            delete env.gui.domElement.dataset.originalBorder;
+            delete env.gui.domElement.dataset.originalBorderRadius;
+            delete env.gui.domElement.dataset.originalPadding;
+            delete env.gui.domElement.dataset.originalMaxHeight;
+            delete env.gui.domElement.dataset.originalOverflowY;
+        }
+        
+        // Restore original text colors
+        const guiTexts = env.gui.domElement.querySelectorAll('*');
+        guiTexts.forEach(element => {
+            if (element.style) {
+                element.style.color = '';
+                element.style.fontSize = '';
+            }
+        });
+    }
+    
+    console.log('Webpage restored after VR');
+}
+
+function handleControllerInput(frame) {
+    if (!vrSurfaceVisualizer) return;
+    
+    if (isRotating) {
+        const currentRotation = vrSurfaceVisualizer.rotation;
+        currentRotation[1] += rotationSpeed;
+        
+        vrSurfaceVisualizer.rotation = currentRotation;
+        
+        if (env.visurf) {
+            env.visurf.rotation = [...currentRotation];
+        }
+    }
+    
+    if (vrControllers.length > 0) {
+        for (const inputSource of vrControllers) {
+            try {
+                let inputPose = null;
+                
+                if (frame.getInputSourcePose) {
+
+                    inputPose = frame.getInputSourcePose(inputSource, xrRefSpace);
+                } else if (frame.getInputPose) {
+                    inputPose = frame.getInputPose(inputSource, xrRefSpace);
+                }
+                
+                if (inputPose) {
+                    // occasional logging
+                    if (Math.random() < 0.01) {
+                        const gripMatrix = inputPose.gripMatrix;
+                        console.log('Controller position:', gripMatrix);
+                    }
+                }
+            } catch (error) {
+                console.log('no controller')
+            }
+        }
+    }
+}
+
+function exitVR() {
+    console.log('Exiting VR...');
+    
+    isVRActive = false;
+    
+    showWebpageAfterVR();
+    
+    if (vrSurfaceVisualizer) {
+        vrSurfaceVisualizer = null;
+    }
+    
+    if (xrSession) {
+        xrSession.end();
+    }
+    
+    xrSession = null;
+    xrRefSpace = null;
+    vrRenderLoop = null;
+    
+    if (env.render) {
+        requestAnimationFrame(env.render);
+    }
+    
+    console.log('VR session ended');
+}
+
+checkVRSupport();
+
+const originalRender = env.render;
+env.render = function() {
+    if (isVRActive) {
+        return;
+    }
+    
+    originalRender.call(this);
+};
+
+function addVRControlsToGUI() {
+    if (env.gui && env.gui.pnl1) {
+        env.gui.pnl1.f5 = env.gui.pnl1.addFolder('Virtual Reality');
+        env.gui.pnl1.f5.add({ enterVR: enterVR }, 'enterVR').name('Enter VR');
+        env.gui.pnl1.f5.add({ exitVR: exitVR }, 'exitVR').name('Exit VR');
+        env.gui.pnl1.f5.add({ isVRActive: () => isVRActive }, 'isVRActive').name('VR Active').listen();
+        
+        // VR Interaction controls
+        env.gui.pnl1.f5.f1 = env.gui.pnl1.f5.addFolder('VR Interaction');
+        env.gui.pnl1.f5.f1.add({ rotationSpeed: rotationSpeed }, 'rotationSpeed', 0.001, 0.1, 0.001)
+            .name('Rotation Speed').onChange((value) => { rotationSpeed = value; });
+        env.gui.pnl1.f5.f1.add({ isRotating: () => isRotating }, 'isRotating').name('Currently Rotating').listen();
+        env.gui.pnl1.f5.f1.add({ controllerCount: () => vrControllers.length }, 'controllerCount').name('Controllers Connected').listen();
+    }
+}
+
+setTimeout(addVRControlsToGUI, 1000);
+
 </script>
 
 
