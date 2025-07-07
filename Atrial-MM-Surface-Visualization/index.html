@@ -1603,48 +1603,53 @@ function createVRButton() {
 
 // Create a VR-compatible surface visualizer
 function createVRSurfaceVisualizer() {
-    // Create a temporary canvas for VR rendering
-    const vrCanvas = document.createElement('canvas');
-    vrCanvas.width = 1024; // VR typically needs higher resolution
-    vrCanvas.height = 1024;
+    console.log('Creating VR surface visualizer using existing visurf...');
     
-    // Create a VR-compatible surface visualizer with fixed world position
-    vrSurfaceVisualizer = new Abubu.SurfaceVisualizer({
-        canvas: vrCanvas,
-        target: env.fcolor0,
-        structure: env.structure,
-        fovy: 0.8, // Wider FOV for VR
-        rotation: [...env.visurf.rotation],
-        translation: [0, 0, -3], // Fixed position 3 units in front of origin
-        scaling: [...env.visurf.scaling],
-        lightDirection: [...env.visurf.lightDirection],
-        lightSpecularTerm: env.visurf.lightSpecularTerm,
-        lightAmbientTerm: env.visurf.lightAmbientTerm,
-        materialSpecularTerm: env.visurf.materialSpecularTerm,
-        materialAmbientTerm: env.visurf.materialAmbientTerm,
-        shininess: env.visurf.shininess,
-        minValue: env.visurf.minValue,
-        maxValue: env.visurf.maxValue,
-        colormap: env.visurf.colormap
-    });
+    // Instead of creating a new surface visualizer, use the existing one
+    vrSurfaceVisualizer = env.visurf;
     
-    // Override the render method to render to XR framebuffer
-    const originalRender = vrSurfaceVisualizer.render;
-    vrSurfaceVisualizer.render = function() {
-        // Update matrices
-        this.updateViewMatrix();
-        this.updateNormalMatrix();
+    // Update the existing visualizer for VR
+    if (vrSurfaceVisualizer) {
+        // Set VR-specific properties
+        vrSurfaceVisualizer.fovy = 0.8; // Wider FOV for VR
+        vrSurfaceVisualizer.translation = [0, 0, -3]; // Fixed position 3 units in front of origin
         
-        // Clear the target textures
-        this.surfaceViewTarget.clear(0,0,0,0);
+        // Ensure the surface visualizer has the correct target texture
+        if (vrSurfaceVisualizer.target && env.fcolor0) {
+            console.log('Setting VR surface visualizer target to fcolor0');
+            vrSurfaceVisualizer.target = env.fcolor0;
+        }
         
-        // Render the scene to textures
-        this.surfaceView.render();
+        // Ensure stereo rendering is enabled
+        if (vrSurfaceVisualizer.surfaceView && vrSurfaceVisualizer.surfaceView.uniforms) {
+            // Make sure the visualizer can handle different view matrices for each eye
+            console.log('Setting up stereo rendering for VR...');
+            
+            // Force update of matrices to ensure they're properly initialized
+            vrSurfaceVisualizer.updateViewMatrix();
+            vrSurfaceVisualizer.updateNormalMatrix();
+            
+            // Make sure the surface view has the correct target
+            if (vrSurfaceVisualizer.surfaceViewTarget) {
+                vrSurfaceVisualizer.surfaceViewTarget.target = env.fcolor0;
+            }
+        }
         
-        // Instead of blending to canvas, render directly to current framebuffer
-        // (which should be the XR framebuffer in VR mode)
-        this.surfaceViewBlend.render();
-    };
+        console.log('VR Surface Visualizer created from existing visurf');
+        console.log('VR Surface Visualizer properties:', {
+            fovy: vrSurfaceVisualizer.fovy,
+            translation: vrSurfaceVisualizer.translation,
+            rotation: vrSurfaceVisualizer.rotation,
+            hasSurfaceView: !!vrSurfaceVisualizer.surfaceView,
+            hasSurfaceViewTarget: !!vrSurfaceVisualizer.surfaceViewTarget,
+            hasSurfaceViewBlend: !!vrSurfaceVisualizer.surfaceViewBlend,
+            target: vrSurfaceVisualizer.target,
+            viewMatrix: vrSurfaceVisualizer.viewMatrix,
+            projectionMatrix: vrSurfaceVisualizer.projectionMatrix
+        });
+    } else {
+        console.error('Failed to get existing surface visualizer');
+    }
     
     return vrSurfaceVisualizer;
 }
@@ -1734,8 +1739,11 @@ function renderVR(time, frame) {
         if (pose) {
             const layer = xrSession.renderState.baseLayer;
             
+            console.log('VR frame processing, views:', pose.views.length);
+            
             // Bind the XR framebuffer
             gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+            console.log('XR framebuffer bound, dimensions:', layer.framebufferWidth, 'x', layer.framebufferHeight);
             
             // Clear the framebuffer with a visible background
             gl.clearColor(0.2, 0.2, 0.2, 1.0);
@@ -1750,22 +1758,27 @@ function renderVR(time, frame) {
                 return;
             }
             
-            // Render for each view (left and right eye)
-            for (const view of pose.views) {
-                const viewport = layer.getViewport(view);
-                gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                
-                // Update camera matrices for this view
-                updateVRCamera(view, pose);
-                
-                // Render the surface visualization in VR
-                renderSurfaceInVR();
-                
-                // Debug: Log successful render
-                if (Math.random() < 0.01) {
-                    console.log('VR frame rendered successfully');
-                }
-            }
+            // Loop through each of the views reported by the frame and draw them
+            // into the corresponding viewport (this creates the stereo effect)
+            console.log('Processing', pose.views.length, 'views for stereo rendering');
+            
+            // Test: Render both eyes to the full framebuffer to see if viewport splitting is the issue
+            gl.viewport(0, 0, layer.framebufferWidth, layer.framebufferHeight);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            console.log('Testing full framebuffer rendering for both eyes');
+            
+            // Render left eye content on the left side
+            gl.viewport(0, 0, layer.framebufferWidth / 2, layer.framebufferHeight);
+            updateVRCamera(pose.views[0], pose);
+            renderSurfaceInVR();
+            
+            // Render right eye content on the right side  
+            gl.viewport(layer.framebufferWidth / 2, 0, layer.framebufferWidth / 2, layer.framebufferHeight);
+            updateVRCamera(pose.views[1], pose);
+            renderSurfaceInVR();
+            
+            console.log('Full framebuffer test completed');
         } else {
             console.error('No pose available in VR render loop');
         }
@@ -1785,22 +1798,50 @@ function updateVRCamera(view, pose) {
         const viewMatrix = view.transform.matrix;
         const projectionMatrix = view.projectionMatrix;
         
+        // Store the current eye for the render function
+        updateVRCamera.currentEye = view.eye;
+        
         if (vrSurfaceVisualizer) {
-            // Set the projection matrix for VR
+            // Set the projection matrix for this specific eye
             vrSurfaceVisualizer.projectionMatrix = projectionMatrix;
-            vrSurfaceVisualizer.surfaceView.uniforms.projectionMatrix.value = projectionMatrix;
+            if (vrSurfaceVisualizer.surfaceView && vrSurfaceVisualizer.surfaceView.uniforms) {
+                vrSurfaceVisualizer.surfaceView.uniforms.projectionMatrix.value = projectionMatrix;
+            }
             
-            // Set the view matrix for VR (this is the camera position/orientation)
+            // Set the view matrix for this specific eye (this creates the stereo effect)
             vrSurfaceVisualizer.viewMatrix = viewMatrix;
-            vrSurfaceVisualizer.surfaceView.uniforms.viewMatrix.value = viewMatrix;
+            if (vrSurfaceVisualizer.surfaceView && vrSurfaceVisualizer.surfaceView.uniforms) {
+                vrSurfaceVisualizer.surfaceView.uniforms.viewMatrix.value = viewMatrix;
+            }
             
             // Update the normal matrix for proper lighting
             vrSurfaceVisualizer.updateNormalMatrix();
             
-            // Debug logging (reduced frequency)
+            // Debug logging - show the actual matrices for each eye
+            console.log('Processing eye:', view.eye);
+            console.log('View Matrix:', Array.from(viewMatrix));
+            console.log('Projection Matrix:', Array.from(projectionMatrix));
+            
+            // Check if matrices are different between eyes (for stereo)
+            if (!updateVRCamera.lastViewMatrix) {
+                updateVRCamera.lastViewMatrix = new Float32Array(16);
+                updateVRCamera.lastEye = view.eye;
+            } else if (updateVRCamera.lastEye !== view.eye) {
+                // Compare matrices between eyes
+                let matricesDifferent = false;
+                for (let i = 0; i < 16; i++) {
+                    if (Math.abs(viewMatrix[i] - updateVRCamera.lastViewMatrix[i]) > 0.001) {
+                        matricesDifferent = true;
+                        break;
+                    }
+                }
+                console.log('Matrices different between eyes:', matricesDifferent);
+                updateVRCamera.lastViewMatrix = new Float32Array(viewMatrix);
+                updateVRCamera.lastEye = view.eye;
+            }
+            
+            // Reduced frequency logging
             if (Math.random() < 0.001) { 
-                console.log('VR View Matrix:', viewMatrix);
-                console.log('VR Projection Matrix:', projectionMatrix);
                 console.log('VR Heart Position:', vrSurfaceVisualizer.translation);
             }
         }
@@ -1811,20 +1852,192 @@ function updateVRCamera(view, pose) {
 
 function renderSurfaceInVR() {
     try {
-        if (vrSurfaceVisualizer && vrSurfaceVisualizer.render) {
-            // Ensure the heart is visible by setting a background color
-            gl.clearColor(0.1, 0.1, 0.1, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            
-            // Render the heart structure
-            vrSurfaceVisualizer.render();
-            
-            // Reset clear color
-            gl.clearColor(0, 0, 0, 1.0);
+        console.log('Starting VR surface rendering...');
+        
+        // Check if we have the heart structure loaded
+        if (!vrSurfaceVisualizer) {
+            console.error('VR Surface Visualizer not available');
+            return;
         }
+        
+        if (!env.structure) {
+            console.error('Heart structure not loaded - please load a JSON file first');
+            return;
+        }
+        
+        console.log('Heart structure check:', {
+            structureLoaded: !!env.structure,
+            structureProperties: env.structure ? Object.keys(env.structure) : null,
+            hasCompressed3dCrdt: !!(env.structure && env.structure.compressed3dCrdt),
+            hasNormals: !!(env.structure && env.structure.normals),
+            fcolor0Loaded: !!env.fcolor0
+        });
+        
+        // Try to render the actual heart structure
+        if (vrSurfaceVisualizer.surfaceView) {
+            console.log('Rendering heart structure in VR...');
+            console.log('Surface view properties:', {
+                hasUniforms: !!vrSurfaceVisualizer.surfaceView.uniforms,
+                uniforms: Object.keys(vrSurfaceVisualizer.surfaceView.uniforms || {}),
+                target: vrSurfaceVisualizer.surfaceView.target,
+                hasTarget: !!vrSurfaceVisualizer.surfaceView.target
+            });
+            
+            // Update the surface visualizer matrices for this eye
+            if (vrSurfaceVisualizer.surfaceView.uniforms) {
+                vrSurfaceVisualizer.surfaceView.uniforms.viewMatrix.value = vrSurfaceVisualizer.viewMatrix;
+                vrSurfaceVisualizer.surfaceView.uniforms.projectionMatrix.value = vrSurfaceVisualizer.projectionMatrix;
+                vrSurfaceVisualizer.surfaceView.uniforms.normalMatrix.value = vrSurfaceVisualizer.normalMatrix;
+                
+                console.log('Matrices updated for eye:', updateVRCamera.currentEye);
+            }
+            
+            // Set the target for the surface view if it doesn't have one
+            if (!vrSurfaceVisualizer.surfaceView.target && env.fcolor0) {
+                console.log('Setting surface view target to fcolor0');
+                vrSurfaceVisualizer.surfaceView.target = env.fcolor0;
+            }
+            
+            // Try to use the normal surface visualizer render method instead
+            try {
+                console.log('Trying normal surface visualizer render...');
+                vrSurfaceVisualizer.render();
+                console.log('Heart structure rendered for eye:', updateVRCamera.currentEye);
+            } catch (renderError) {
+                console.error('Error during normal surface visualizer render:', renderError);
+                
+                // Fallback to surface view render
+                try {
+                    console.log('Falling back to surface view render...');
+                    vrSurfaceVisualizer.surfaceView.render();
+                    console.log('Heart structure rendered for eye:', updateVRCamera.currentEye);
+                } catch (surfaceViewError) {
+                    console.error('Error during surface view render:', surfaceViewError);
+                    throw surfaceViewError;
+                }
+            }
+        } else {
+            console.error('Surface view not available in VR visualizer');
+            console.log('VR Surface Visualizer properties:', {
+                hasSurfaceView: !!vrSurfaceVisualizer.surfaceView,
+                hasSurfaceViewTarget: !!vrSurfaceVisualizer.surfaceViewTarget,
+                hasSurfaceViewBlend: !!vrSurfaceVisualizer.surfaceViewBlend,
+                target: vrSurfaceVisualizer.target,
+                structure: !!env.structure
+            });
+            // Fallback to test cube
+            renderSimpleStereoTest();
+        }
+        
     } catch (error) {
         console.error('Error rendering surface in VR:', error);
+        console.error('Error stack:', error.stack);
+        // Fallback to test cube if heart rendering fails
+        renderSimpleStereoTest();
     }
+}
+
+function renderSimpleStereoTest() {
+    // Create a simple shader program for testing stereo
+    if (!renderSimpleStereoTest.program) {
+        const vsSource = `#version 300 es
+            precision highp float;
+            in vec3 aPosition;
+            uniform mat4 uProjectionMatrix;
+            uniform mat4 uViewMatrix;
+            uniform mat4 uModelMatrix;
+            void main() {
+                gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aPosition, 1.0);
+            }`;
+        
+        const fsSource = `#version 300 es
+            precision highp float;
+            uniform vec3 uColor;
+            out vec4 outColor;
+            void main() {
+                outColor = vec4(uColor, 1.0);
+            }`;
+        
+        function compileShader(type, src) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error('Shader compilation error:', gl.getShaderInfoLog(s));
+            }
+            return s;
+        }
+        
+        const vs = compileShader(gl.VERTEX_SHADER, vsSource);
+        const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+            console.error('Program linking error:', gl.getProgramInfoLog(prog));
+        }
+        
+        renderSimpleStereoTest.program = prog;
+        renderSimpleStereoTest.aPosition = gl.getAttribLocation(prog, 'aPosition');
+        renderSimpleStereoTest.uProjectionMatrix = gl.getUniformLocation(prog, 'uProjectionMatrix');
+        renderSimpleStereoTest.uViewMatrix = gl.getUniformLocation(prog, 'uViewMatrix');
+        renderSimpleStereoTest.uModelMatrix = gl.getUniformLocation(prog, 'uModelMatrix');
+        renderSimpleStereoTest.uColor = gl.getUniformLocation(prog, 'uColor');
+        renderSimpleStereoTest.buffer = gl.createBuffer();
+        
+        // Create a simple cube geometry
+        const vertices = new Float32Array([
+            // Front face
+            -0.5, -0.5,  0.5,
+             0.5, -0.5,  0.5,
+             0.5,  0.5,  0.5,
+            -0.5,  0.5,  0.5,
+            // Back face
+            -0.5, -0.5, -0.5,
+             0.5, -0.5, -0.5,
+             0.5,  0.5, -0.5,
+            -0.5,  0.5, -0.5,
+        ]);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, renderSimpleStereoTest.buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    }
+    
+    gl.useProgram(renderSimpleStereoTest.program);
+    
+    // Create identity model matrix
+    const modelMatrix = new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, -2, 1  // Move 2 units back
+    ]);
+    
+    // Set matrices
+    gl.uniformMatrix4fv(renderSimpleStereoTest.uProjectionMatrix, false, vrSurfaceVisualizer.projectionMatrix);
+    gl.uniformMatrix4fv(renderSimpleStereoTest.uViewMatrix, false, vrSurfaceVisualizer.viewMatrix);
+    gl.uniformMatrix4fv(renderSimpleStereoTest.uModelMatrix, false, modelMatrix);
+    
+    // Set color (different for each eye to test stereo)
+    const currentEye = updateVRCamera.currentEye;
+    const eyeColor = currentEye === 'left' ? [1, 0, 0] : [0, 1, 0]; // Red for left, green for right
+    gl.uniform3fv(renderSimpleStereoTest.uColor, eyeColor);
+    
+    console.log('Rendering test cube for eye:', currentEye, 'color:', eyeColor);
+    
+    // Draw cube
+    gl.bindBuffer(gl.ARRAY_BUFFER, renderSimpleStereoTest.buffer);
+    gl.enableVertexAttribArray(renderSimpleStereoTest.aPosition);
+    gl.vertexAttribPointer(renderSimpleStereoTest.aPosition, 3, gl.FLOAT, false, 0, 0);
+    
+    // Draw front and back faces
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    gl.drawArrays(gl.TRIANGLE_FAN, 4, 4);
+    
+    gl.disableVertexAttribArray(renderSimpleStereoTest.aPosition);
+    gl.useProgram(null);
 }
 
 function onInputSourcesChange(event) {
